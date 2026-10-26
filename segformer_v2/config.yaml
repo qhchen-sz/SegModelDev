@@ -1,0 +1,46 @@
+# SegFormer v2 改进配置 —— Focal+Dice+Lovász 损失 + 640 分辨率 + Copy-paste silie + TTA
+project_root: D:/qhchen/NewModel/ADevFolder
+
+train_list: D:/qhchen/NewModel/ADevFolder/train.txt
+val_list:   D:/qhchen/NewModel/ADevFolder/val.txt
+
+num_classes: 3
+id2label:
+  0: background
+  1: silie
+  2: fanzhe
+
+# 切块（v2: 640 分辨率，保 silie 细节）
+tile_size: 640
+stride: 512          # overlap 128
+bg_keep_ratio: 0.12
+
+# 损失权重（Focal + Dice + Lovász 组合）
+loss_focal: 1.0
+loss_dice: 1.0
+loss_lovasz: 1.0
+focal_gamma: 2.0
+focal_alpha: [0.20, 2.00, 1.00]   # 类别权重
+
+# Copy-paste silie 增强
+copy_paste_prob: 0.5
+silie_crops_dir: D:/qhchen/NewModel/ADevFolder/segformer_v2/silie_crops
+
+# 训练
+model_ckpt: D:/qhchen/NewModel/ADevFolder/segformer_baseline/models/segformer-b1-ade  # 复用已转好的 b1 权重
+epochs: 200
+batch_size: 16         # b1 + 640，先保守；冒烟后调
+lr: 0.00006
+weight_decay: 0.01
+num_workers: 8
+seed: 42
+eval_every: 1          # 每 epoch 评估存 best
+out_dir: D:/qhchen/NewModel/ADevFolder/segformer_v2/runs
+resume: true            # 有 ckpt 则断点续训
+
+# 推理（TTA + 640 + 密集 overlap）
+infer_stride: 320
+tta: true               # 推理时水平/垂直翻转
+
+# 复用 segformer 已生成的全图 GT
+val_full_txt: D:/qhchen/NewModel/ADevFolder/segformer_baseline/dataset/val_full.txt

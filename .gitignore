@@ -1,0 +1,78 @@
+**__pycache__/
+images/
+labels/
+**runs/
+**runs_strat/
+**dataset/
+**dataset_strat/
+segformer_v2/silie_crops/
+best.pt
+best000.pt
+images.cache
+labels.cache
+last.pt
+deploy_cpp/build/
+segformer_v2/dataset_strat_b/
+segformer_v2/dataset_sw_s1/
+deploy_cpp/EVDll_Segformer/dll
+deploy_cpp/EVDll_Segformer/obj
+deploy_cpp/EVDll_Segformer/SegTest/bin
+deploy_cpp/EVDll_Segformer/SegTest/obj
+**.vs/
+.vscode/
+**x64/
+deploy_cpp/segformer_dll/out
+deploy_cpp/EVDll_Segformer/out
+
+# RTX50 工程：编译中间文件与产物（DLL/PDB 不随仓库提交，需要时手动拷）
+deploy_cpp/segformer_dll50/obj/
+deploy_cpp/segformer_dll50/out/
+deploy_cpp/segformer_dll50/Debug/
+deploy_cpp/segformer_dll50/*.dll
+deploy_cpp/segformer_dll50/*.lib
+deploy_cpp/segformer_dll50/*.exp
+deploy_cpp/segformer_dll50/*.pdb
+# RTX50 引擎（与具体 GPU 绑定，必须在目标机重建）
+deploy_cpp/models50/
+deploy_cpp/models/
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# 模型权重和部署产物（需要时通过脚本生成）
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.engine
+*.bin
+
+# 原始日志、缓存和会话记录
+*.log
+*.cache
+hf.json
+sovler.txt
+hefei_data_expansion_train.txt
+deploy_cpp/hefeic1_segformer_training.txt
+train_split.log
+train_split_noempty.log
+新建文本文档.txt
+
+# 二进制参考文档
+deploy_cpp/papers/*.pdf
+deploy_cpp/papers/*.docx
+
+# IDE 用户文件
+*.user
+.vs/
+.vscode/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 本地环境配置
+.env

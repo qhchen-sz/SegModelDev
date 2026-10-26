@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SegTest —— 端到端自测台（控制台）。引用 EVDll_Segformer，并把原生的
+  segformer_Dll_func.dll 拷到输出目录，这样测试走的 C# → P/Invoke → C++ 路径
+  与视觉软件完全一致。
+  用 SegTest.bat 启动（它会设好 TRT/CUDA/OpenCV 的 PATH）。
+-->
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <ProjectGuid>{B2C3D4E5-F6A7-4B8C-9D0E-1F2A3B4C5D6E}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>SegTest</RootNamespace>
+    <AssemblyName>SegTest</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <WarningLevel>4</WarningLevel>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <!-- Debug 仅供 VS 里调试用；交付用 Release（见 EVDll_Segformer.csproj 的同样说明）。 -->
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <OutputPath>bin\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\EVDll_Segformer.csproj">
+      <Project>{A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D}</Project>
+      <Name>EVDll_Segformer</Name>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- 原生 DLL 放到测试程序旁边，否则 DllImport 找不到 -->
+  <Target Name="CopyNativeDll" AfterTargets="Build">
+    <Copy SourceFiles="..\..\build\Release\segformer_Dll_func.dll"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('..\..\build\Release\segformer_Dll_func.dll')" />
+  </Target>
+
+  <!-- Debug 配置额外把原生运行时依赖也拷到输出目录，让 VS 里 F5 直接可调试。
+       原因：F5 启动的进程继承 VS 的 PATH，不会经过 SegTest.bat 设置的 PATH；
+       若输出目录只有 segformer_Dll_func.dll，加载器会因找不到 nvinfer.dll /
+       opencv_world480.dll 报 DllNotFoundException (0x8007007E)。
+       Release 仍走 SegTest.bat（已设 PATH），不重复拷贝这 ~260MB。 -->
+  <PropertyGroup>
+    <TrtRoot>E:\Tensorrt\TensorRT-8.6.1.6</TrtRoot>
+    <OpenCvBuild>E:\opencv_exe\opencv\build</OpenCvBuild>
+    <CudaRoot>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1</CudaRoot>
+  </PropertyGroup>
+
+  <Target Name="CopyNativeRuntimeDlls" AfterTargets="Build"
+          Condition="'$(Configuration)' == 'Debug'">
+    <ItemGroup>
+      <NativeRuntimeDll Include="$(TrtRoot)\lib\nvinfer.dll"
+                        Condition="Exists('$(TrtRoot)\lib\nvinfer.dll')" />
+      <NativeRuntimeDll Include="$(OpenCvBuild)\x64\vc16\bin\opencv_world480.dll"
+                        Condition="Exists('$(OpenCvBuild)\x64\vc16\bin\opencv_world480.dll')" />
+      <NativeRuntimeDll Include="$(CudaRoot)\bin\cudart64_12.dll"
+                        Condition="Exists('$(CudaRoot)\bin\cudart64_12.dll')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NativeRuntimeDll)" DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true" />
+    <Warning Text="[SegTest] 原生运行时 DLL 未全部找到，Debug 可能仍报 0x8007007E；请检查 TrtRoot / OpenCvBuild / CudaRoot"
+             Condition="'@(NativeRuntimeDll->Count())' != '3'" />
+  </Target>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

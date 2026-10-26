@@ -1,0 +1,38 @@
+# Mask2Former baseline 配置 —— 极耳翻折/撕裂 实例分割
+project_root: D:/qhchen/NewModel/ADevFolder
+
+train_list: D:/qhchen/NewModel/ADevFolder/train.txt
+val_list:   D:/qhchen/NewModel/ADevFolder/val.txt
+
+# 类别（实例分割，num_labels 不含背景；背景由 null 类处理）
+num_labels: 2
+id2label:
+  0: silie      # 撕裂
+  1: fanzhe     # 翻折
+# 语义图用（评估时实例涂成语义图 0/1/2）
+semantic_id2label:
+  0: background
+  1: silie
+  2: fanzhe
+
+# 滑窗切块（同 SegFormer，便于横向对比）
+tile_size: 512
+stride: 384
+bg_keep_ratio: 0.12
+
+# 训练
+model_ckpt: D:/qhchen/NewModel/ADevFolder/mask2former_baseline/models/m2f-swin-tiny-coco-instance
+epochs: 300
+batch_size: 8          # swin-tiny 比 SegFormer-b1 重，先保守，冒烟后可调
+lr: 0.00005
+weight_decay: 0.05
+num_workers: 8
+seed: 42
+eval_every: 1          # 每 1 epoch 评估并存 best
+out_dir: D:/qhchen/NewModel/ADevFolder/mask2former_baseline/runs
+
+# 推理
+infer_stride: 448
+
+# 评估复用 SegFormer 已生成的全图 GT
+val_full_txt: D:/qhchen/NewModel/ADevFolder/segformer_baseline/dataset/val_full.txt

@@ -1,0 +1,34 @@
+# SegFormer baseline 分层重切配置 —— 与 config.yaml 同结构，仅改 list/out/dataset
+project_root: D:/qhchen/NewModel/ADevFolder
+
+train_list: D:/qhchen/NewModel/ADevFolder/train_strat.txt
+val_list:   D:/qhchen/NewModel/ADevFolder/val_strat.txt
+
+dataset_dir: D:/qhchen/NewModel/ADevFolder/segformer_baseline/dataset_strat
+out_dir:     D:/qhchen/NewModel/ADevFolder/segformer_baseline/runs_strat
+# 复用 v2 生成的全图 GT（同一套 rasterize，保证五模型同口径）
+val_full_txt: D:/qhchen/NewModel/ADevFolder/segformer_v2/dataset_strat/val_full.txt
+
+num_classes: 3
+id2label:
+  0: background
+  1: silie
+  2: fanzhe
+class_weights: [0.20, 2.00, 1.00]
+
+tile_size: 512
+stride: 384
+bg_keep_ratio: 0.12
+
+model_ckpt: D:/qhchen/NewModel/ADevFolder/segformer_baseline/models/segformer-b1-ade
+epochs: 5000
+patience: 100
+batch_size: 24
+lr: 0.00006
+weight_decay: 0.01
+num_workers: 4
+seed: 42
+out_dir_strat: true   # 占位，实际用 out_dir
+eval_every: 1
+
+infer_stride: 448

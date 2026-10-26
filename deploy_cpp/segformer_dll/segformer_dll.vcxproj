@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  segformer_dll.vcxproj —— SegFormer 语义分割 C++ DLL 的原生 VS 工程（已自包含）。
+
+  【自包含】trt_engine / seg_pipeline 的 .cpp/.hpp 已从 ..\src 复制进本目录，
+  本工程不再依赖 deploy_cpp\src\。
+  ⚠️ 这两份是 ..\src 下同名文件的副本，必须同步改（见各文件头部注释）。
+     ..\src 那份仍被 seg_infer.exe 与 CMakeLists.txt 使用。
+
+  【配置】Release|x64 与 Debug|x64。
+  - Release：交付用。Optimization=MaxSpeed，运行时库 MultiThreadedDLL(/MD)。
+  - Debug  ：调试用。Optimization=Disabled，运行时库 MultiThreadedDebugDLL(/MDd)。
+    ⚠️ TensorRT 与 OpenCV 都是 Release 库（import lib，只是 DLL 的导入表，不含 CRT），
+       因此 Debug 配置直接复用同一批 Release lib 可链接；本 DLL 只导出纯 C ABI、
+       不跨边界传 C++ 对象，故 /MDd 与 OpenCV/TRT 的 Release CRT 不冲突。
+       若极少数情况下链接报 LNK4098/CRT 相关告警，把 Debug 的 RuntimeLibrary
+       改回 MultiThreadedDLL 即可。
+
+  ⚠️ 设置与 deploy_cpp\CMakeLists.txt 的 segformer_dll 目标必须保持一致（改一处同步另一处）。
+-->
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{C3D4E5F6-A7B8-4C9D-8E1F-2A3B4C5D6E7F}</ProjectGuid>
+    <RootNamespace>segformer_dll</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+
+  <!-- 依赖根目录：与 CMakeLists.txt 的 TRT_ROOT / OPENCV_BUILD_DIR 对应。
+       换机器只改这两行；CUDA 走 $(CUDA_PATH) 环境变量。 -->
+  <PropertyGroup Label="UserMacros">
+    <TrtRoot>E:\Tensorrt\TensorRT-8.6.1.6</TrtRoot>
+    <OpenCvBuild>E:\opencv_exe\opencv\build</OpenCvBuild>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>segformer_Dll_func</TargetName>
+    <OutDir>$(ProjectDir)..\build\Debug\</OutDir>
+    <IntDir>$(ProjectDir)x64\Debug\</IntDir>
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>segformer_Dll_func</TargetName>
+    <OutDir>$(ProjectDir)..\build\Release\</OutDir>
+    <IntDir>$(ProjectDir)x64\Release\</IntDir>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <!-- 源码含中文注释，必须显式 /utf-8，否则 MSVC 按 GBK 解析会出 C4819 甚至乱码 -->
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;SEGFORMER_DLL_EXPORTS;_WINDOWS;_USRDLL;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(TrtRoot)\include;$(CUDA_PATH)\include;$(OpenCvBuild)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(TrtRoot)\lib;$(CUDA_PATH)\lib\x64;$(OpenCvBuild)\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <!-- Debug 必须链 OpenCV 的 **debug 库** opencv_world480d.lib：
+           否则 _DEBUG 下 OpenCV 头把类型放进 cv::debug_build_guard 命名空间，
+           与 Release 库的符号对不上 -> LNK2019(cv::resize 等)。运行时对应
+           opencv_world480d.dll（在 build\x64\vc16\bin 下，run_seg_test.bat 的 PATH 已含该目录）。 -->
+      <AdditionalDependencies>nvinfer.lib;nvinfer_plugin.lib;cudart.lib;opencv_world480d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;SEGFORMER_DLL_EXPORTS;_WINDOWS;_USRDLL;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(TrtRoot)\include;$(CUDA_PATH)\include;$(OpenCvBuild)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(TrtRoot)\lib;$(CUDA_PATH)\lib\x64;$(OpenCvBuild)\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>nvinfer.lib;nvinfer_plugin.lib;cudart.lib;opencv_world480.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- 推理内核改为本目录副本（自包含）；与 ..\src 下同名文件保持同步 -->
+  <ItemGroup>
+    <ClCompile Include="segformer_dll.cpp" />
+    <ClCompile Include="trt_engine.cpp" />
+    <ClCompile Include="seg_pipeline.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="segformer_dll.h" />
+    <ClInclude Include="trt_engine.hpp" />
+    <ClInclude Include="seg_pipeline.hpp" />
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>

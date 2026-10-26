@@ -1,0 +1,32 @@
+# SegFormer baseline 配置 —— 极耳翻折(fanzhe)/撕裂(silie) 语义分割
+project_root: D:/qhchen/NewModel/ADevFolder
+
+# 数据划分（工程已有）
+train_list: D:/qhchen/NewModel/ADevFolder/train.txt
+val_list:   D:/qhchen/NewModel/ADevFolder/val.txt
+
+# 类别
+num_classes: 3
+id2label:
+  0: background
+  1: silie      # 撕裂
+  2: fanzhe     # 翻折
+class_weights: [0.20, 2.00, 1.00]   # CE 损失权重，silie 最高，缓解类别不平衡
+
+# 滑窗切块
+tile_size: 512
+stride: 384          # overlap = tile - stride = 128
+bg_keep_ratio: 0.12 # 纯背景块保留比例（控制背景过载）
+
+# 训练（本地 safetensors 权重，由 convert_weights.py 生成）
+model_ckpt: D:/qhchen/NewModel/ADevFolder/segformer_baseline/models/segformer-b1-ade
+epochs: 150
+batch_size: 24
+lr: 0.00006
+weight_decay: 0.01
+num_workers: 4
+seed: 42
+out_dir: D:/qhchen/NewModel/ADevFolder/segformer_baseline/runs
+
+# 推理
+infer_stride: 448    # 全图推理 overlap（略大于训练 stride 提高精度）

@@ -1,0 +1,11 @@
+# YOLO 分层重切数据 yaml（不改动 newsiliec9.yaml）
+# train_strat.txt / val_strat.txt 由 split_stratified.py 生成（全部446张按类别组合分层8:2）
+path: D:/qhchen/NewModel/ADevFolder
+train: train_strat.txt
+val: val_strat.txt
+test:
+
+names:
+  0: __background__
+  1: silie
+  2: fanzhe

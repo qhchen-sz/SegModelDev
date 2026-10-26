@@ -1,0 +1,43 @@
+# SegFormer v2 分层重切配置 —— 与 config.yaml 同结构，仅改 list/out/dataset
+project_root: D:/qhchen/NewModel/ADevFolder
+
+train_list: D:/qhchen/NewModel/ADevFolder/train_strat.txt
+val_list:   D:/qhchen/NewModel/ADevFolder/val_strat.txt
+
+# 新数据/输出目录（绝不覆盖旧 dataset / runs）
+dataset_dir: D:/qhchen/NewModel/ADevFolder/segformer_v2/dataset_strat
+out_dir:     D:/qhchen/NewModel/ADevFolder/segformer_v2/runs_strat
+val_full_txt: D:/qhchen/NewModel/ADevFolder/segformer_v2/dataset_strat/val_full.txt
+
+num_classes: 3
+id2label:
+  0: background
+  1: silie
+  2: fanzhe
+
+tile_size: 640
+stride: 512
+bg_keep_ratio: 0.12
+
+loss_focal: 1.0
+loss_dice: 1.0
+loss_lovasz: 1.0
+focal_gamma: 2.0
+focal_alpha: [0.20, 2.00, 1.00]
+
+copy_paste_prob: 0.5
+silie_crops_dir: D:/qhchen/NewModel/ADevFolder/segformer_v2/silie_crops
+
+model_ckpt: D:/qhchen/NewModel/ADevFolder/segformer_baseline/models/segformer-b1-ade
+epochs: 5000
+patience: 100           # 早停：连续 patience 个 epoch 无提升则停（与 yolo 一致，纯靠早停）
+batch_size: 16
+lr: 0.00006
+weight_decay: 0.01
+num_workers: 4
+seed: 42
+eval_every: 1
+resume: true
+
+infer_stride: 320
+tta: true
