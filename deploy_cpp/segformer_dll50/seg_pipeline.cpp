@@ -1,9 +1,16 @@
-// ⚠️ deploy_cpp\src\seg_pipeline.cpp 的副本，两处请同步改（见 seg_pipeline.hpp 头部说明）。
+// ★ segformer_dll50（RTX50 / TensorRT 10）专用：固定 batch=1 + 多路 context 并发。
+//   与 ..\segformer_dll 及 ..\src 的版本已分叉，不要再互相同步（见 seg_pipeline.hpp 说明）。
 #include "seg_pipeline.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <cstdio>
+#include <exception>
+#include <functional>
+#include <mutex>
+#include <thread>
 
 namespace {
 
@@ -30,6 +37,15 @@ void fillNCHW(const cv::Mat& bgr, float* dst, int tile) {
         }
     }
 }
+
+// 多 worker 并发期间把 OpenCV 内部线程池压到 1：否则 4 路 worker 各自再开
+// OpenCV 线程会造成严重过订阅（resize 本身是访存受限，单线程足够）。
+// 仅在「worker 创建 + 推理」这段作用域内生效，argmax/叠加图仍用默认线程数。
+struct CvThreadsToOne {
+    int old;
+    CvThreadsToOne() : old(cv::getNumThreads()) { cv::setNumThreads(1); }
+    ~CvThreadsToOne() { cv::setNumThreads(old); }
+};
 
 }  // namespace
 
@@ -58,31 +74,26 @@ SegPipeline::~SegPipeline() {
 }
 
 // 幂等释放。重复 init()（SegLoad 重试 / 热切换模型）时若直接覆盖这些成员，
-// 每轮会漏掉约 160 MB（75 MiB 显存 + 75 MiB pinned 主机内存）以及一个 stream。
+// 每轮会漏掉显存、pinned 主机内存与 stream。
+//
+// 注意：execution context 不在这里销毁 —— 它由 TrtEngine 统一持有，并在
+// engine.load()/teardown()/析构时销毁。这里只释放 stream/device/pinned 缓冲。
+void SegPipeline::releaseWorkers() {
+    for (auto& w : workers_) {
+        // 显存是 cudaMalloc 在本进程 CUDA 上下文里分配的，cudaFree 不依赖 TrtEngine 对象。
+        if (w.dIn) cudaFree(w.dIn);
+        if (w.dOut) cudaFree(w.dOut);
+        if (w.hIn) cudaFreeHost(w.hIn);
+        if (w.hOut) cudaFreeHost(w.hOut);
+        if (w.stream) cudaStreamDestroy(w.stream);
+        w = Worker{};
+    }
+    workers_.clear();
+}
+
 void SegPipeline::release() {
-    // 显存是 cudaMalloc 在本进程 CUDA 上下文里分配的，经哪个 TrtEngine 释放都可以；
-    // 仅用 eng_ 做非空判断（从未 init 过时这些指针本来就是空的）。
-    if (eng_) {
-        eng_->freeDevice(dIn_);
-        eng_->freeDevice(dOut_);
-    }
-    dIn_ = nullptr;
-    dOut_ = nullptr;
-    dInBytes_ = 0;
-    dOutBytes_ = 0;
-    if (hIn_) {
-        cudaFreeHost(hIn_);
-        hIn_ = nullptr;
-    }
-    if (hOut_) {
-        cudaFreeHost(hOut_);
-        hOut_ = nullptr;
-    }
-    if (stream_) {
-        cudaStreamDestroy(stream_);
-        stream_ = nullptr;
-    }
-    std::vector<float>().swap(upBuf_);   // 真正归还约 75 MB 的上采样中转缓冲
+    releaseWorkers();
+    std::vector<float>().swap(upAll_);   // 真正归还上采样中转缓冲
 }
 
 bool SegPipeline::init(TrtEngine& eng, const SegConfig& cfg, std::string& err) {
@@ -100,42 +111,100 @@ bool SegPipeline::init(TrtEngine& eng, const SegConfig& cfg, std::string& err) {
         err = "engine input does not have 3 channels";
         return false;
     }
-    if (cfg_.batch < 1) cfg_.batch = 1;
-    if (cfg_.batch > eng.maxBatch()) cfg_.batch = eng.maxBatch();
+    // RTX50 / TensorRT 10：该模型 batch>1 数值错误，强制每路 1 块。
+    // （并发通过 numWorkers 提升，而不是 batch。）
+    cfg_.batch = 1;
+    const int nWant = std::max(1, cfg_.numWorkers);
 
-    std::size_t outElems = 0;
-    if (!eng.setBatch(cfg_.batch, outElems, err)) return false;
-    const std::vector<int>& od = eng.outputDims();
-    if (od.size() != 4 || od[1] != cfg_.numClasses) {
-        err = "unexpected engine output dims";
-        return false;
+    // 上一轮由本管线创建的 context 如果还在（正常情况下 engine.load 已清空），先销毁，
+    // 避免重复 init 时 context 累积占用显存。
+    eng.destroyContexts();
+
+    // 从 nWant 递减尝试：显存/context 不足时自动降级到更少路数，而不是启动失败。
+    for (int n = nWant; n >= 1; --n) {
+        std::size_t outElems = 0;
+        int oH = 0, oW = 0;
+        bool ok = true;
+
+        workers_.clear();
+        workers_.resize(static_cast<std::size_t>(n));
+
+        for (int i = 0; i < n && ok; ++i) {
+            Worker& w = workers_[i];
+            w.ctx = eng.createContext();
+            if (!w.ctx) {
+                err = "createExecutionContext failed";
+                ok = false;
+                break;
+            }
+            if (!eng.setBatchOn(w.ctx, cfg_.batch, w.outElems, err)) {
+                ok = false;
+                break;
+            }
+            if (i == 0) {
+                const std::vector<int>& od = eng.outputDims();
+                if (od.size() != 4 || od[1] != cfg_.numClasses) {
+                    err = "unexpected engine output dims";
+                    ok = false;
+                    break;
+                }
+                oH = od[2];
+                oW = od[3];
+                outElems = w.outElems;
+            }
+
+            w.dInBytes = static_cast<std::size_t>(cfg_.batch) * 3 * tile_ * tile_ * sizeof(float);
+            w.dOutBytes = w.outElems * sizeof(float);
+
+            w.dIn = eng.allocDevice(w.dInBytes, err);
+            if (!w.dIn) {
+                ok = false;
+                break;
+            }
+            w.dOut = eng.allocDevice(w.dOutBytes, err);
+            if (!w.dOut) {
+                ok = false;
+                break;
+            }
+            if (!TrtEngine::cudaCheck(cudaStreamCreate(&w.stream), "cudaStreamCreate", err)) {
+                ok = false;
+                break;
+            }
+            // pinned 主机内存：否则 cudaMemcpyAsync 对 pageable 内存会退化成同步拷贝
+            if (!TrtEngine::cudaCheck(
+                    cudaHostAlloc(reinterpret_cast<void**>(&w.hIn), w.dInBytes,
+                                  cudaHostAllocDefault),
+                    "cudaHostAlloc(input)", err)) {
+                ok = false;
+                break;
+            }
+            if (!TrtEngine::cudaCheck(
+                    cudaHostAlloc(reinterpret_cast<void**>(&w.hOut), w.dOutBytes,
+                                  cudaHostAllocDefault),
+                    "cudaHostAlloc(output)", err)) {
+                ok = false;
+                break;
+            }
+        }
+
+        if (ok) {
+            outH_ = oH;
+            outW_ = oW;
+            (void)outElems;
+            if (n < nWant) {
+                std::fprintf(stderr,
+                             "[SegPipeline] 资源不足，并发路数由 %d 降级为 %d\n", nWant, n);
+            }
+            return true;
+        }
+
+        // 本轮失败：释放已分配的 stream/缓冲，并销毁本轮创建的 context，然后降级重试。
+        releaseWorkers();
+        eng.destroyContexts();
     }
-    outH_ = od[2];
-    outW_ = od[3];
 
-    dInBytes_ = static_cast<std::size_t>(cfg_.batch) * 3 * tile_ * tile_ * sizeof(float);
-    dOutBytes_ = outElems * sizeof(float);
-
-    dIn_ = eng.allocDevice(dInBytes_, err);
-    if (!dIn_) return false;
-    dOut_ = eng.allocDevice(dOutBytes_, err);
-    if (!dOut_) return false;
-    if (!TrtEngine::cudaCheck(cudaStreamCreate(&stream_), "cudaStreamCreate", err)) return false;
-
-    // pinned 主机内存：否则 cudaMemcpyAsync 对 pageable 内存会退化成同步拷贝
-    if (!TrtEngine::cudaCheck(cudaHostAlloc(reinterpret_cast<void**>(&hIn_), dInBytes_,
-                                            cudaHostAllocDefault),
-                              "cudaHostAlloc(input)", err)) {
-        return false;
-    }
-    if (!TrtEngine::cudaCheck(cudaHostAlloc(reinterpret_cast<void**>(&hOut_), dOutBytes_,
-                                            cudaHostAllocDefault),
-                              "cudaHostAlloc(output)", err)) {
-        return false;
-    }
-    upBuf_.resize(static_cast<std::size_t>(cfg_.batch) * cfg_.numClasses * tile_ * tile_);
-
-    return true;
+    if (err.empty()) err = "pipeline init failed";
+    return false;
 }
 
 // 复刻 infer_fast_strat.py:28-42 的 collect_tiles
@@ -179,6 +248,15 @@ bool SegPipeline::debugForwardTile(const cv::Mat& bgrIn, std::vector<float>& log
     }
     if (bgr.depth() != CV_8U) bgr.convertTo(bgr, CV_8U);
 
+    if (workers_.empty()) {
+        err = "pipeline not initialized";
+        return false;
+    }
+    if (cfg_.batch != 1) {
+        err = "debugForwardTile requires batch=1";
+        return false;
+    }
+
     cv::Mat patch = bgr(cv::Rect(0, 0, std::min(tile_, bgr.cols), std::min(tile_, bgr.rows)));
     if (patch.rows != tile_ || patch.cols != tile_) {
         cv::Mat padded;
@@ -186,28 +264,27 @@ bool SegPipeline::debugForwardTile(const cv::Mat& bgrIn, std::vector<float>& log
                            cv::BORDER_REFLECT);
         patch = padded;
     }
-    fillNCHW(patch, hIn_, tile_);
 
-    std::size_t outElems = 0;
-    if (!eng_->setBatch(1, outElems, err)) return false;
-    const std::size_t inBytes = static_cast<std::size_t>(3) * tile_ * tile_ * sizeof(float);
-    const std::size_t outBytes = outElems * sizeof(float);
+    // 单 tile 调试只需要一路资源；复用 worker[0]，不与 inferImage 并发调用。
+    Worker& w = workers_[0];
+    fillNCHW(patch, w.hIn, tile_);
+    const std::size_t outElems = w.outElems;
 
     if (!TrtEngine::cudaCheck(
-            cudaMemcpyAsync(dIn_, hIn_, inBytes, cudaMemcpyHostToDevice, stream_),
+            cudaMemcpyAsync(w.dIn, w.hIn, w.dInBytes, cudaMemcpyHostToDevice, w.stream),
             "cudaMemcpyAsync(H2D)", err)) {
         return false;
     }
-    if (!eng_->infer(dIn_, dOut_, stream_, err)) return false;
+    if (!eng_->inferOn(w.ctx, w.dIn, w.dOut, w.stream, err)) return false;
     if (!TrtEngine::cudaCheck(
-            cudaMemcpyAsync(hOut_, dOut_, outBytes, cudaMemcpyDeviceToHost, stream_),
+            cudaMemcpyAsync(w.hOut, w.dOut, w.dOutBytes, cudaMemcpyDeviceToHost, w.stream),
             "cudaMemcpyAsync(D2H)", err)) {
         return false;
     }
-    if (!TrtEngine::cudaCheck(cudaStreamSynchronize(stream_), "cudaStreamSynchronize", err)) {
+    if (!TrtEngine::cudaCheck(cudaStreamSynchronize(w.stream), "cudaStreamSynchronize", err)) {
         return false;
     }
-    logits.assign(hOut_, hOut_ + outElems);
+    logits.assign(w.hOut, w.hOut + outElems);
     return true;
 }
 
@@ -240,13 +317,34 @@ bool SegPipeline::inferImage(const cv::Mat& bgrIn, cv::Mat& labels, std::string&
 
     const auto t0 = std::chrono::high_resolution_clock::now();
 
-    for (std::size_t i = 0; i < tiles.size(); i += cfg_.batch) {
-        const int n = static_cast<int>(std::min<std::size_t>(cfg_.batch, tiles.size() - i));
+    if (workers_.empty()) {
+        err = "pipeline not initialized";
+        return false;
+    }
 
-        // 各 j 写 hIn_ 里互不重叠的一段，可并行
-        cv::parallel_for_(cv::Range(0, n), [&](const cv::Range& r) {
-            for (int j = r.start; j < r.end; ++j) {
-                const Tile& t = tiles[i + j];
+    const int tileHW = tile_ * tile_;
+    const int planeHW = outH_ * outW_;
+    const std::size_t upStride =
+        static_cast<std::size_t>(cfg_.numClasses) * static_cast<std::size_t>(tileHW);
+
+    // 每块的上采样结果先落到 upAll_[j]，供主线程最后按原顺序串行累加。
+    // 每个位置都会被 cv::resize 整块覆盖，不需要清零；resize 同尺寸时是空操作。
+    upAll_.resize(tiles.size() * upStride);
+
+    // 任务队列：worker 并行做「预处理 -> H2D -> 推理 -> D2H -> 上采样」，
+    // 各 tile 完全独立；累加仍留给主线程串行完成（见下）。
+    std::atomic<std::size_t> next{0};
+    std::atomic<bool> failed{false};
+    std::mutex errMutex;
+    std::string workerErr;
+
+    auto run = [&](Worker& w) {
+        try {
+            for (;;) {
+                const std::size_t j = next.fetch_add(1);
+                if (j >= tiles.size() || failed.load()) break;
+
+                const Tile& t = tiles[j];
                 cv::Mat patch = bgr(cv::Rect(t.x0, t.y0, t.pw, t.ph));
                 if (t.ph != tile_ || t.pw != tile_) {
                     cv::Mat padded;
@@ -255,60 +353,75 @@ bool SegPipeline::inferImage(const cv::Mat& bgrIn, cv::Mat& labels, std::string&
                                        cv::BORDER_REFLECT);
                     patch = padded;
                 }
-                fillNCHW(patch, hIn_ + static_cast<std::size_t>(j) * 3 * tile_ * tile_, tile_);
+                fillNCHW(patch, w.hIn, tile_);
+
+                std::string e;
+                if (!TrtEngine::cudaCheck(
+                        cudaMemcpyAsync(w.dIn, w.hIn, w.dInBytes, cudaMemcpyHostToDevice,
+                                        w.stream),
+                        "cudaMemcpyAsync(H2D)", e) ||
+                    !eng_->inferOn(w.ctx, w.dIn, w.dOut, w.stream, e) ||
+                    !TrtEngine::cudaCheck(
+                        cudaMemcpyAsync(w.hOut, w.dOut, w.dOutBytes, cudaMemcpyDeviceToHost,
+                                        w.stream),
+                        "cudaMemcpyAsync(D2H)", e) ||
+                    !TrtEngine::cudaCheck(cudaStreamSynchronize(w.stream),
+                                          "cudaStreamSynchronize", e)) {
+                    std::lock_guard<std::mutex> lk(errMutex);
+                    if (workerErr.empty()) workerErr = e;
+                    failed = true;
+                    return;
+                }
+
+                float* dst = upAll_.data() + j * upStride;
+                for (int c = 0; c < cfg_.numClasses; ++c) {
+                    cv::Mat src(outH_, outW_, CV_32F,
+                                w.hOut + static_cast<std::size_t>(c) * planeHW);
+                    cv::Mat d(tile_, tile_, CV_32F,
+                              dst + static_cast<std::size_t>(c) * tileHW);
+                    // 与 F.interpolate(..., bilinear, align_corners=False) 同为半像素中心约定
+                    cv::resize(src, d, cv::Size(tile_, tile_), 0, 0, cv::INTER_LINEAR);
+                }
             }
-        });
+        } catch (const std::exception& e) {
+            std::lock_guard<std::mutex> lk(errMutex);
+            if (workerErr.empty()) workerErr = std::string("worker: ") + e.what();
+            failed = true;
+        }
+    };
 
-        std::size_t outElems = 0;
-        if (!eng_->setBatch(n, outElems, err)) return false;
-        const std::size_t perImage = outElems / static_cast<std::size_t>(n);
-        const std::size_t inBytes =
-            static_cast<std::size_t>(n) * 3 * tile_ * tile_ * sizeof(float);
-        const std::size_t outBytes = outElems * sizeof(float);
-
-        if (!TrtEngine::cudaCheck(
-                cudaMemcpyAsync(dIn_, hIn_, inBytes, cudaMemcpyHostToDevice, stream_),
-                "cudaMemcpyAsync(H2D)", err)) {
+    std::vector<std::thread> ths;
+    {
+        CvThreadsToOne cvGuard;   // worker 内 cv::resize 单线程，避免与 4 路并发叠加
+        ths.reserve(workers_.size());
+        try {
+            for (auto& w : workers_) ths.emplace_back(run, std::ref(w));
+        } catch (const std::exception& e) {
+            // 线程创建失败：先等已启动的线程结束，再返回错误（thread 析构前必须 join）
+            for (auto& th : ths) {
+                if (th.joinable()) th.join();
+            }
+            err = std::string("thread create failed: ") + e.what();
             return false;
         }
-        if (!eng_->infer(dIn_, dOut_, stream_, err)) return false;
-        if (!TrtEngine::cudaCheck(
-                cudaMemcpyAsync(hOut_, dOut_, outBytes, cudaMemcpyDeviceToHost, stream_),
-                "cudaMemcpyAsync(D2H)", err)) {
-            return false;
-        }
-        if (!TrtEngine::cudaCheck(cudaStreamSynchronize(stream_), "cudaStreamSynchronize", err)) {
-            return false;
-        }
+        for (auto& th : ths) th.join();
+    }
 
-        const int planeHW = outH_ * outW_;
-        const int tileHW = tile_ * tile_;
+    if (failed.load()) {
+        err = workerErr.empty() ? "inference failed" : workerErr;
+        return false;
+    }
 
-        // 上采样并行化：每个 (j,c) 写 upBuf_ 里互不重叠的一段
-        cv::parallel_for_(cv::Range(0, n * cfg_.numClasses), [&](const cv::Range& r) {
-            for (int idx = r.start; idx < r.end; ++idx) {
-                const int j = idx / cfg_.numClasses;
-                const int c = idx % cfg_.numClasses;
-                cv::Mat src(outH_, outW_, CV_32F,
-                            const_cast<float*>(hOut_ + static_cast<std::size_t>(j) * perImage +
-                                               static_cast<std::size_t>(c) * planeHW));
-                cv::Mat dst(tile_, tile_, CV_32F,
-                            upBuf_.data() + static_cast<std::size_t>(idx) * tileHW);
-                // 与 F.interpolate(..., bilinear, align_corners=False) 同为半像素中心约定
-                cv::resize(src, dst, cv::Size(tile_, tile_), 0, 0, cv::INTER_LINEAR);
-            }
-        });
-
-        // 累加只能串行：stride(448) < tile(640)，相邻块的 ROI 是重叠的
-        for (int j = 0; j < n; ++j) {
-            const Tile& t = tiles[i + j];
-            for (int c = 0; c < cfg_.numClasses; ++c) {
-                const int idx = j * cfg_.numClasses + c;
-                cv::Mat up(tile_, tile_, CV_32F,
-                           upBuf_.data() + static_cast<std::size_t>(idx) * tileHW);
-                cv::Mat roi = acc[c](cv::Rect(t.x0, t.y0, t.pw, t.ph));
-                roi += up(cv::Rect(0, 0, t.pw, t.ph));
-            }
+    // 累加只能串行：stride(448) < tile(640)，相邻块的 ROI 是重叠的。
+    // 仍按 tile 原始顺序累加，保证与 Python / 30 系 TRT8.6 逐像素一致。
+    for (std::size_t j = 0; j < tiles.size(); ++j) {
+        const Tile& t = tiles[j];
+        const float* up = upAll_.data() + j * upStride;
+        for (int c = 0; c < cfg_.numClasses; ++c) {
+            cv::Mat upm(tile_, tile_, CV_32F,
+                        const_cast<float*>(up + static_cast<std::size_t>(c) * tileHW));
+            cv::Mat roi = acc[c](cv::Rect(t.x0, t.y0, t.pw, t.ph));
+            roi += upm(cv::Rect(0, 0, t.pw, t.ph));
         }
     }
 

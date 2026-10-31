@@ -42,6 +42,7 @@ TrtEngine::~TrtEngine() {
 //   10.0 移除），改用 delete —— 这些接口都带虚析构。保留 #if 分支是为了本文件
 //   在 TRT 8/10 两套 SDK 下都能直接编译（本工程实际只会用 TRT 10）。
 void TrtEngine::teardown() {
+    destroyContexts();
 #if NV_TENSORRT_MAJOR >= 10
     delete ctx_;
     ctx_ = nullptr;
@@ -66,6 +67,8 @@ void TrtEngine::teardown() {
     inName_.clear();
     outName_.clear();
     inC_ = inH_ = inW_ = 0;
+    inBatch_ = -1;
+    batchDynamic_ = false;
     maxBatch_ = 1;
     outStaticDims_ = nvinfer1::Dims{};
     outDims_.clear();
@@ -132,6 +135,7 @@ bool TrtEngine::load(const std::string& enginePath, std::string& err) {
         err = "expected a 4D input (NCHW), got " + dimsStr(d);
         return false;
     }
+    inBatch_ = d.d[0];
     inC_ = d.d[1];
     inH_ = d.d[2];
     inW_ = d.d[3];
@@ -141,8 +145,13 @@ bool TrtEngine::load(const std::string& enginePath, std::string& err) {
         return false;
     }
 
+    // batch 是否动态要用 profile 的 min/max 判断：getTensorShape() 对动态输入返回什么
+    // 由 TRT 版本决定（可能返回 -1，也可能返回 profile 形状），不能作为静态判断依据。
+    nvinfer1::Dims pmin = engine_->getProfileShape(
+        inName_.c_str(), 0, nvinfer1::OptProfileSelector::kMIN);
     nvinfer1::Dims pmax = engine_->getProfileShape(
         inName_.c_str(), 0, nvinfer1::OptProfileSelector::kMAX);
+    batchDynamic_ = (pmin.nbDims >= 1 && pmax.nbDims >= 1 && pmin.d[0] != pmax.d[0]);
     maxBatch_ = (pmax.nbDims >= 1 && pmax.d[0] > 0) ? pmax.d[0] : 1;
 
     // 输出的空间维在建引擎时已固定（本项目 160x160），只有 batch 维是 -1。
@@ -175,14 +184,47 @@ void TrtEngine::describe() const {
     }
 }
 
-bool TrtEngine::setBatch(int batch, std::size_t& outElems, std::string& err) {
+// 创建一个额外 execution context，由本对象统一持有（析构/teardown 时销毁）。
+nvinfer1::IExecutionContext* TrtEngine::createContext() {
+    if (!engine_) return nullptr;
+    nvinfer1::IExecutionContext* c = engine_->createExecutionContext();
+    if (c) ctxs_.push_back(c);
+    return c;
+}
+
+void TrtEngine::destroyContexts() {
+    for (auto* c : ctxs_) {
+        if (!c) continue;
+#if NV_TENSORRT_MAJOR >= 10
+        delete c;
+#else
+        c->destroy();
+#endif
+    }
+    ctxs_.clear();
+}
+
+bool TrtEngine::setBatchOn(nvinfer1::IExecutionContext* ctx, int batch, std::size_t& outElems,
+                           std::string& err) {
+    if (!ctx) {
+        err = "null execution context";
+        return false;
+    }
     if (batch < 1 || batch > maxBatch_) {
         err = "batch " + std::to_string(batch) + " out of engine profile range [1," +
               std::to_string(maxBatch_) + "]";
         return false;
     }
     nvinfer1::Dims4 d{batch, inC_, inH_, inW_};
-    if (!ctx_->setInputShape(inName_.c_str(), d)) {
+    if (!batchDynamic_) {
+        // 静态 batch 引擎：形状不可改。值一致时跳过 setInputShape（TRT10 对静态输入
+        // 调用 setInputShape 会做严格比较，不一致时报 API Usage Error）。
+        if (batch != maxBatch_) {
+            err = "engine has static batch " + std::to_string(maxBatch_) +
+                  ", cannot set batch " + std::to_string(batch);
+            return false;
+        }
+    } else if (!ctx->setInputShape(inName_.c_str(), d)) {
         err = "setInputShape failed for " + dimsStr(d);
         return false;
     }
@@ -205,6 +247,11 @@ bool TrtEngine::setBatch(int batch, std::size_t& outElems, std::string& err) {
     return true;
 }
 
+// 默认 context 上的兼容入口（debugForwardTile / 单路串行路径使用）。
+bool TrtEngine::setBatch(int batch, std::size_t& outElems, std::string& err) {
+    return setBatchOn(ctx_, batch, outElems, err);
+}
+
 void* TrtEngine::allocDevice(std::size_t bytes, std::string& err) {
     void* p = nullptr;
     if (!cudaCheck(cudaMalloc(&p, bytes), "cudaMalloc", err)) return nullptr;
@@ -215,19 +262,28 @@ void TrtEngine::freeDevice(void* p) {
     if (p) cudaFree(p);
 }
 
-bool TrtEngine::infer(void* dIn, void* dOut, cudaStream_t stream, std::string& err) {
-    if (!ctx_->setTensorAddress(inName_.c_str(), dIn)) {
+bool TrtEngine::inferOn(nvinfer1::IExecutionContext* ctx, void* dIn, void* dOut,
+                        cudaStream_t stream, std::string& err) {
+    if (!ctx) {
+        err = "null execution context";
+        return false;
+    }
+    if (!ctx->setTensorAddress(inName_.c_str(), dIn)) {
         err = "setTensorAddress(input) failed";
         return false;
     }
-    if (!ctx_->setTensorAddress(outName_.c_str(), dOut)) {
+    if (!ctx->setTensorAddress(outName_.c_str(), dOut)) {
         err = "setTensorAddress(output) failed";
         return false;
     }
-    if (!ctx_->enqueueV3(stream)) {
+    if (!ctx->enqueueV3(stream)) {
         err = "enqueueV3 failed";
         return false;
     }
     if (!cudaCheck(cudaStreamSynchronize(stream), "cudaStreamSynchronize", err)) return false;
     return true;
+}
+
+bool TrtEngine::infer(void* dIn, void* dOut, cudaStream_t stream, std::string& err) {
+    return inferOn(ctx_, dIn, dOut, stream, err);
 }

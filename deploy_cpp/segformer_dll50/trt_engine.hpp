@@ -50,6 +50,21 @@ public:
     // 设定本次推理的 batch，并推算出输出张量的总元素数（用于分配显存）
     bool setBatch(int batch, std::size_t& outElems, std::string& err);
 
+    // ---- 多流并发（RTX50）：同一个引擎创建多个独立 execution context ----
+    // 每个 context 有独立 workspace，可被不同线程同时使用；生命周期由本对象管理，
+    // 在 destroyContexts() / teardown() / 析构时统一销毁，调用方不要自行 delete。
+    // 注意：IExecutionContext 本身不是线程安全的，一个 context 只能被一个线程使用。
+    nvinfer1::IExecutionContext* createContext();
+    void destroyContexts();
+
+    // 在指定 context 上设定 batch / 执行推理。
+    // setBatchOn 会写 outputDims()，只允许在单线程初始化阶段调用；
+    // inferOn 只读写传入的 context 与地址，可被多个线程并发调用（各自不同 context/stream）。
+    bool setBatchOn(nvinfer1::IExecutionContext* ctx, int batch, std::size_t& outElems,
+                    std::string& err);
+    bool inferOn(nvinfer1::IExecutionContext* ctx, void* dIn, void* dOut, cudaStream_t stream,
+                 std::string& err);
+
     // 设备内存管理
     void* allocDevice(std::size_t bytes, std::string& err);
     void freeDevice(void* p);
@@ -66,13 +81,16 @@ private:
     TrtLogger logger_;
     nvinfer1::IRuntime* runtime_ = nullptr;
     nvinfer1::ICudaEngine* engine_ = nullptr;
-    nvinfer1::IExecutionContext* ctx_ = nullptr;
+    nvinfer1::IExecutionContext* ctx_ = nullptr;   // 默认单 context（debug/兼容）
+    std::vector<nvinfer1::IExecutionContext*> ctxs_;  // createContext() 创建的额外 context
 
     std::string inName_;
     std::string outName_;
     int inC_ = 0;
     int inH_ = 0;
     int inW_ = 0;
+    int inBatch_ = -1;        // 引擎输入 batch 维（getTensorShape 原值，仅诊断用）
+    bool batchDynamic_ = false;  // batch 维是否动态（由 profile min/max 判断，最可靠）
     int maxBatch_ = 1;
     nvinfer1::Dims outStaticDims_{};   // 引擎侧输出形状（batch 维为 -1，其余已固定）
     std::vector<int> outDims_;         // 最近一次 setBatch() 推断出的完整形状

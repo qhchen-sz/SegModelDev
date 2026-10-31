@@ -76,3 +76,8 @@ Thumbs.db
 
 # 本地环境配置
 .env
+
+rfdetr/
+deploy_cpp/tools/tiles_bin
+deploy_cpp/tools/results
+fix50_batch16_bug.txt

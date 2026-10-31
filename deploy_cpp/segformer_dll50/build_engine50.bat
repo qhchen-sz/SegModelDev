@@ -128,13 +128,16 @@ echo [build_engine50] engine    = %ENGINE%
 echo [build_engine50] NOTE      = engine is built for THIS GPU only.
 echo.
 
-REM Fixed 640x640: every sliding-window tile is exactly 640x640, so the
-REM spatial dims never need to be dynamic; batch stays 1-16.
+REM RTX50 + TensorRT 10: this model is numerically WRONG for batch>1
+REM (logits shift, the whole image becomes background); only batch=1 is
+REM correct. The DLL therefore runs batch=1 and uses multi-stream
+REM concurrency (SEGFORMER_WORKERS) for throughput.
+REM Fixed batch=1: spatial 640x640 fixed, batch static 1.
 "%TRT%\bin\trtexec.exe" --onnx="%ONNX%" --saveEngine="%ENGINE%" %PRECFLAG% ^
     --minShapes=pixel_values:1x3x640x640 ^
-    --optShapes=pixel_values:16x3x640x640 ^
-    --maxShapes=pixel_values:16x3x640x640 ^
-    --memPoolSize=workspace:4096MiB
+    --optShapes=pixel_values:1x3x640x640 ^
+    --maxShapes=pixel_values:1x3x640x640 ^
+    --memPoolSize=workspace:1024MiB
 if errorlevel 1 (
     echo.
     echo [ERROR] trtexec failed.

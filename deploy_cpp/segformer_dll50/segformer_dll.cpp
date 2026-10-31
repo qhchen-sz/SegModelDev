@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <string>
@@ -18,8 +19,9 @@
 
 namespace {
 
-// 与 sweep_eval.py 完全一致的口径：tile 由引擎决定(640)，stride 448，batch 16。
-// 刻意不暴露成可调参数——这是已验证的配置，调歪了只会静默掉精度。
+// RTX50 / TensorRT 10 实测：该模型 batch>1 时 logits 系统性偏移（缺陷类被压低、
+// 全图判成背景），只有 batch=1 数值正确。因此固定 batch=1，用多路并发换吞吐。
+// numWorkers 默认 4，可用环境变量 SEGFORMER_WORKERS（1~16）覆盖以便现场调优。
 const SegConfig kConfig{};
 
 thread_local std::string tlsError;
@@ -149,7 +151,12 @@ bool SegLoad(const char* enginePath, void* model) {
             setError("SegLoad: " + err);
             return false;
         }
-        if (!h->pipe.init(h->engine, kConfig, err)) {
+        SegConfig cfg = kConfig;
+        if (const char* env = std::getenv("SEGFORMER_WORKERS")) {
+            const int n = std::atoi(env);
+            if (n >= 1 && n <= 16) cfg.numWorkers = n;
+        }
+        if (!h->pipe.init(h->engine, cfg, err)) {
             setError("SegLoad: pipeline init: " + err);
             return false;
         }

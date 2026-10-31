@@ -1,12 +1,13 @@
 #pragma once
 // 整图滑窗推理管线。
 //
-// ⚠️ 本文件是 deploy_cpp\src\seg_pipeline.hpp 的**副本**（让 segformer_dll 工程自包含）。
-//    两处必须保持一致：改这里请同步改 ..\src\seg_pipeline.hpp，反之亦然。
-//    （seg_infer.exe 使用 ..\src 下那一份；CMake 的 segformer_dll 目标与本 VS 工程使用本副本。）
+// ★ 本文件属于 segformer_dll50（RTX50 / TensorRT 10 版本），已与 ..\segformer_dll
+//   及 ..\src 版本分叉：RTX50 上该模型 **batch>1 数值错误**（logits 系统性偏移、
+//   整图被判成背景），只有 batch=1 正确，因此这里固定 batch=1，改用 numWorkers 路
+//   execution context 并发来换吞吐。修改时不要再与本工程外的副本互相同步。
 //
-// 这里是 infer_fast_strat.py 的 C++ 复刻，必须逐条对齐，否则 val_strat 上的
-// IoU 会对不上基线（mIoU 0.7531 / silie 0.5611 / fanzhe 0.7081）：
+// 单块预处理/上采样/累加的语义仍与 infer_fast_strat.py 逐条对齐
+// （mIoU 0.7531 / silie 0.5611 / fanzhe 0.7081）：
 //
 //   collect_tiles       :28-42   -> collectTiles()
 //   预处理              :45-47   -> fillNCHW()
@@ -26,7 +27,10 @@
 
 struct SegConfig {
     int stride = 448;      // 滑窗步长；tile 由引擎输入尺寸决定（本项目为 640）
-    int batch = 16;        // 单次前向包含多少块
+    // RTX50 / TensorRT 10 实测：该模型 batch>1 时 logits 系统性偏移（缺陷类被压低），
+    // 只有 batch=1 数值正确。因此本工程固定 batch=1，用多路并发换吞吐。
+    int batch = 1;         // 每路前向的 batch（RTX50 必须为 1）
+    int numWorkers = 4;    // 并发路数：每路独立 execution context + stream
     int numClasses = 3;    // 0 背景 / 1 silie / 2 fanzhe
 };
 
@@ -59,8 +63,24 @@ private:
         int ph, pw;   // 有效区域（padding 之前）的尺寸
     };
 
-    // 幂等释放 dIn_/dOut_/hIn_/hOut_/stream_/upBuf_。析构与重复 init() 共用。
+    // 每个并发路一套独立资源：context 由 TrtEngine 持有（本类不销毁），
+    // stream/device/pinned 缓冲由本类分配与释放。
+    struct Worker {
+        nvinfer1::IExecutionContext* ctx = nullptr;
+        cudaStream_t stream = nullptr;
+        void* dIn = nullptr;     // [1,3,tile,tile] float32
+        void* dOut = nullptr;    // [1,3,outH,outW] float32
+        std::size_t dInBytes = 0;
+        std::size_t dOutBytes = 0;
+        std::size_t outElems = 0;
+        float* hIn = nullptr;    // pinned (cudaHostAlloc)
+        float* hOut = nullptr;   // pinned
+    };
+
+    // 幂等释放所有 worker 的 stream/device/pinned 缓冲与 upAll_。析构与重复 init() 共用。
+    // 注意：不销毁 ctx —— ctx 的生命周期由 TrtEngine（engine.load/teardown）管理。
     void release();
+    void releaseWorkers();
 
     void collectTiles(int H, int W, std::vector<Tile>& out) const;
 
@@ -70,16 +90,8 @@ private:
     int outH_ = 0;
     int outW_ = 0;
 
-    void* dIn_ = nullptr;    // [batch,3,tile,tile] float32
-    void* dOut_ = nullptr;   // [batch,3,outH,outW] float32
-    std::size_t dInBytes_ = 0;
-    std::size_t dOutBytes_ = 0;
-    cudaStream_t stream_ = nullptr;
-
-    float* hIn_ = nullptr;       // pinned 主机内存 (cudaHostAlloc)
-    float* hOut_ = nullptr;      // pinned 主机内存；pageable 内存会让
-                                 // cudaMemcpyAsync 退化成同步拷贝，实测这是大头
-    std::vector<float> upBuf_;   // 上采样中转缓冲，供并行 resize 写入
+    std::vector<Worker> workers_;
+    std::vector<float> upAll_;   // [tiles * numClasses * tile * tile] 上采样结果
 
     double lastMs_ = 0.0;
 };
