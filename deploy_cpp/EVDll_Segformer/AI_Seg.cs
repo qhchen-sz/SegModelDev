@@ -42,6 +42,11 @@ namespace EVDll_Segformer
         public static extern int SegForward(IntPtr bgrData, int width, int height, int stride,
                                             IntPtr model);
 
+        // 只推理、不生成叠加图；只取 mask / 统计时用它可省掉每帧一次原图拷贝和叠加图生成。
+        [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int SegForwardMask(IntPtr bgrData, int width, int height, int stride,
+                                                IntPtr model);
+
         [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr SegGetOverlay(ref int width, ref int height, ref int step,
                                                   ref int channels, IntPtr model);
@@ -148,23 +153,9 @@ namespace EVDll_Segformer
 
             try
             {
-                byte[] pixelData;
-                int width, height, stride;
-                GetBitmapData(input, out pixelData, out width, out height, out stride);
-
-                GCHandle pinned = default(GCHandle);
-                try
-                {
-                    pinned = GCHandle.Alloc(pixelData, GCHandleType.Pinned);
-                    int rc = Native.SegForward(pinned.AddrOfPinnedObject(), width, height, stride,
-                                               _handle);
-                    if (rc != 0)
-                        throw new InvalidOperationException("SegForward 返回 " + rc + "：" + LastError());
-                }
-                finally
-                {
-                    if (pinned.IsAllocated) pinned.Free();
-                }
+                int rc = ForwardCore(input, false);
+                if (rc != 0)
+                    throw new InvalidOperationException("SegForward 返回 " + rc + "：" + LastError());
             }
             finally
             {
@@ -172,6 +163,35 @@ namespace EVDll_Segformer
             }
 
             return FetchImage(false);
+        }
+
+        /// <summary>
+        /// 只推理、不生成叠加图。只需要 mask / 统计时用它，省掉每帧一次原图拷贝、
+        /// 一次叠加图生成（约 23MB）以及叠加图 Bitmap 的分配/回收。
+        /// 行为与 50 系列一致：不主动清空上一帧原图。
+        /// </summary>
+        public bool RunMask(Bitmap bitmap)
+        {
+            if (_disposed) throw new ObjectDisposedException("SegModel");
+            if (_handle == IntPtr.Zero) throw new InvalidOperationException("模型未打开，请先 Init");
+            if (bitmap == null || bitmap.Width <= 0 || bitmap.Height <= 0)
+                throw new ArgumentException("传入图片为空，请检查传入图片是否正确");
+
+            Bitmap input = bitmap.PixelFormat == PixelFormat.Format24bppRgb
+                ? bitmap
+                : To24bppRgb(bitmap);
+
+            try
+            {
+                int rc = ForwardCore(input, true);
+                if (rc != 0)
+                    throw new InvalidOperationException("SegForwardMask 返回 " + rc + "：" + LastError());
+            }
+            finally
+            {
+                if (!ReferenceEquals(input, bitmap)) input.Dispose();
+            }
+            return true;
         }
 
         /// <summary>取最近一次推理的纯语义图：单通道，像素值 0/1/2。</summary>
@@ -232,6 +252,44 @@ namespace EVDll_Segformer
         }
 
         // ---- 内部 ----
+
+        // 直接锁定位图并把 Scan0 交给 native：省掉每帧 23MB 的托管 byte[] 分配、
+        // 一次整幅拷贝和一个 Pinned GCHandle。SegForward 返回前会把像素拷进
+        // lastInput，因此 UnlockBits 之后原数据失效没有影响。
+        private int ForwardCore(Bitmap input, bool maskOnly)
+        {
+            BitmapData bd = input.LockBits(new Rectangle(0, 0, input.Width, input.Height),
+                                           ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+            try
+            {
+                if (bd.Stride > 0)
+                {
+                    return maskOnly
+                        ? Native.SegForwardMask(bd.Scan0, input.Width, input.Height, bd.Stride, _handle)
+                        : Native.SegForward(bd.Scan0, input.Width, input.Height, bd.Stride, _handle);
+                }
+            }
+            finally
+            {
+                input.UnlockBits(bd);
+            }
+
+            // 负步长（自底向上的 DIB）不能直接交给 native，回退到托管 byte[] 路径。
+            byte[] pixelData;
+            int width, height, stride;
+            GetBitmapData(input, out pixelData, out width, out height, out stride);
+            GCHandle pinned = GCHandle.Alloc(pixelData, GCHandleType.Pinned);
+            try
+            {
+                return maskOnly
+                    ? Native.SegForwardMask(pinned.AddrOfPinnedObject(), width, height, stride, _handle)
+                    : Native.SegForward(pinned.AddrOfPinnedObject(), width, height, stride, _handle);
+            }
+            finally
+            {
+                if (pinned.IsAllocated) pinned.Free();
+            }
+        }
 
         private Bitmap FetchImage(bool wantMask)
         {
@@ -380,6 +438,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg1:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg1:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg1:AI RunMask报错：" + e;
+                return false;
             }
         }
 

@@ -33,16 +33,17 @@ void fillNCHW(const cv::Mat& bgr, float* dst, int tile) {
 
 }  // namespace
 
-cv::Mat segOverlay(const cv::Mat& bgr, const cv::Mat& labels, float alpha) {
+void segOverlayInto(const cv::Mat& bgr, const cv::Mat& labels, cv::Mat& dst, float alpha) {
     const cv::Vec3f cols[3] = {cv::Vec3f(60, 60, 60), cv::Vec3f(0, 0, 255),
                                cv::Vec3f(255, 0, 0)};
-    cv::Mat ov = bgr.clone();
+    // copyTo 在 dst 尺寸/类型已匹配时直接复用其内存，不会每帧重新分配。
+    bgr.copyTo(dst);
     // 逐行独立，行并行不改变任何输出像素（叠加图在 DLL 的每帧路径上，值得并行）
-    cv::parallel_for_(cv::Range(0, ov.rows), [&](const cv::Range& r) {
+    cv::parallel_for_(cv::Range(0, dst.rows), [&](const cv::Range& r) {
         for (int y = r.start; y < r.end; ++y) {
             const uchar* lab = labels.ptr<uchar>(y);
-            cv::Vec3b* row = ov.ptr<cv::Vec3b>(y);
-            for (int x = 0; x < ov.cols; ++x) {
+            cv::Vec3b* row = dst.ptr<cv::Vec3b>(y);
+            for (int x = 0; x < dst.cols; ++x) {
                 const cv::Vec3f& c = cols[std::min<int>(lab[x], 2)];
                 for (int k = 0; k < 3; ++k) {
                     row[x][k] = static_cast<uchar>(row[x][k] * (1.0f - alpha) + c[k] * alpha);
@@ -50,6 +51,11 @@ cv::Mat segOverlay(const cv::Mat& bgr, const cv::Mat& labels, float alpha) {
             }
         }
     });
+}
+
+cv::Mat segOverlay(const cv::Mat& bgr, const cv::Mat& labels, float alpha) {
+    cv::Mat ov;
+    segOverlayInto(bgr, labels, ov, alpha);
     return ov;
 }
 
@@ -83,6 +89,7 @@ void SegPipeline::release() {
         stream_ = nullptr;
     }
     std::vector<float>().swap(upBuf_);   // 真正归还约 75 MB 的上采样中转缓冲
+    std::vector<cv::Mat>().swap(acc_);   // 归还累加缓冲（cv::Mat 析构释放像素内存）
 }
 
 bool SegPipeline::init(TrtEngine& eng, const SegConfig& cfg, std::string& err) {
@@ -235,8 +242,13 @@ bool SegPipeline::inferImage(const cv::Mat& bgrIn, cv::Mat& labels, std::string&
     std::vector<Tile> tiles;
     collectTiles(H, W, tiles);
 
-    std::vector<cv::Mat> acc(cfg_.numClasses);
-    for (int c = 0; c < cfg_.numClasses; ++c) acc[c] = cv::Mat::zeros(H, W, CV_32F);
+    // 复用成员缓冲：尺寸/类型不变时 create 是空操作，只做 setTo(0)。
+    // cv::Mat::create 不初始化内存，所以清零这一步不能省。
+    if (static_cast<int>(acc_.size()) != cfg_.numClasses) acc_.resize(cfg_.numClasses);
+    for (int c = 0; c < cfg_.numClasses; ++c) {
+        acc_[c].create(H, W, CV_32F);
+        acc_[c].setTo(0);
+    }
 
     const auto t0 = std::chrono::high_resolution_clock::now();
 
@@ -306,7 +318,7 @@ bool SegPipeline::inferImage(const cv::Mat& bgrIn, cv::Mat& labels, std::string&
                 const int idx = j * cfg_.numClasses + c;
                 cv::Mat up(tile_, tile_, CV_32F,
                            upBuf_.data() + static_cast<std::size_t>(idx) * tileHW);
-                cv::Mat roi = acc[c](cv::Rect(t.x0, t.y0, t.pw, t.ph));
+                cv::Mat roi = acc_[c](cv::Rect(t.x0, t.y0, t.pw, t.ph));
                 roi += up(cv::Rect(0, 0, t.pw, t.ph));
             }
         }
@@ -317,9 +329,9 @@ bool SegPipeline::inferImage(const cv::Mat& bgrIn, cv::Mat& labels, std::string&
     labels.create(H, W, CV_8UC1);
     cv::parallel_for_(cv::Range(0, H), [&](const cv::Range& r) {
         for (int y = r.start; y < r.end; ++y) {
-            const float* a0 = acc[0].ptr<float>(y);
-            const float* a1 = acc[1].ptr<float>(y);
-            const float* a2 = acc.size() > 2 ? acc[2].ptr<float>(y) : nullptr;
+            const float* a0 = acc_[0].ptr<float>(y);
+            const float* a1 = acc_[1].ptr<float>(y);
+            const float* a2 = acc_.size() > 2 ? acc_[2].ptr<float>(y) : nullptr;
             uchar* out = labels.ptr<uchar>(y);
             for (int x = 0; x < W; ++x) {
                 int best = 0;

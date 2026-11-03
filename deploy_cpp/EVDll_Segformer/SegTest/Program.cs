@@ -5,6 +5,7 @@
 // 用法：
 //   SegTest <engine> --eval <val_full.txt> <outDir>   逐图推理并导出 mask（供算 IoU）
 //   SegTest <engine> <图片或目录>  <outDir> [--mask]  普通推理，导出叠加图（--mask 时再导 mask）
+//   SegTest <engine> <图片或目录>  <outDir> --maskonly  只推理，不生成叠加图，只导出 mask
 
 using System;
 using System.Diagnostics;
@@ -37,7 +38,7 @@ namespace SegTest
             {
                 Console.WriteLine("用法:");
                 Console.WriteLine("  SegTest <engine> --eval <val_full.txt> <outDir>");
-                Console.WriteLine("  SegTest <engine> <图片或目录> <outDir> [--mask]");
+                Console.WriteLine("  SegTest <engine> <图片或目录> <outDir> [--mask] [--maskonly]");
                 return 2;
             }
 
@@ -57,7 +58,8 @@ namespace SegTest
 
                 if (args[1] == "--eval") return EvalMode(model, args[2], args[3]);
                 return ImageMode(model, args[1], args[2],
-                                 Array.IndexOf(args, "--mask") >= 0);
+                                 Array.IndexOf(args, "--mask") >= 0,
+                                 Array.IndexOf(args, "--maskonly") >= 0);
             }
         }
 
@@ -100,7 +102,8 @@ namespace SegTest
             return 0;
         }
 
-        private static int ImageMode(SegModel model, string input, string outDir, bool wantMask)
+        private static int ImageMode(SegModel model, string input, string outDir, bool wantMask,
+                                     bool maskOnly)
         {
             Directory.CreateDirectory(outDir);
             string[] files;
@@ -122,25 +125,36 @@ namespace SegTest
 
                 using (Bitmap bmp = new Bitmap(f))
                 {
+                    string stem = Path.GetFileNameWithoutExtension(f);
                     Stopwatch sw = Stopwatch.StartNew();
-                    using (Bitmap overlay = model.Run(bmp))
+                    if (maskOnly)
                     {
+                        model.RunMask(bmp);
                         sw.Stop();
-                        string stem = Path.GetFileNameWithoutExtension(f);
-                        overlay.Save(Path.Combine(outDir, stem + ".png"), ImageFormat.Png);
-                        if (wantMask)
-                        {
-                            Directory.CreateDirectory(Path.Combine(outDir, "mask"));
-                            using (Bitmap mask = model.GetMask())
-                                mask.Save(Path.Combine(outDir, "mask", stem + ".png"), ImageFormat.Png);
-                        }
-                        SegStat st = model.GetStat();
-                        Console.WriteLine(string.Format(
-                            "  {0,-52} {1}x{2} {3:F0}ms  ng={4} px[bg={5} silie={6} fanzhe={7}] comp[bg={8} silie={9} fanzhe={10}] box={11}",
-                            Path.GetFileName(f), bmp.Width, bmp.Height, sw.Elapsed.TotalMilliseconds,
-                            st.ng, st.px[0], st.px[1], st.px[2],
-                            st.ncomp[0], st.ncomp[1], st.ncomp[2], st.nbox));
+                        Directory.CreateDirectory(Path.Combine(outDir, "mask"));
+                        using (Bitmap mask = model.GetMask())
+                            mask.Save(Path.Combine(outDir, "mask", stem + ".png"), ImageFormat.Png);
                     }
+                    else
+                    {
+                        using (Bitmap overlay = model.Run(bmp))
+                        {
+                            sw.Stop();
+                            overlay.Save(Path.Combine(outDir, stem + ".png"), ImageFormat.Png);
+                            if (wantMask)
+                            {
+                                Directory.CreateDirectory(Path.Combine(outDir, "mask"));
+                                using (Bitmap mask = model.GetMask())
+                                    mask.Save(Path.Combine(outDir, "mask", stem + ".png"), ImageFormat.Png);
+                            }
+                        }
+                    }
+                    SegStat st = model.GetStat();
+                    Console.WriteLine(string.Format(
+                        "  {0,-52} {1}x{2} {3:F0}ms  ng={4} px[bg={5} silie={6} fanzhe={7}] comp[bg={8} silie={9} fanzhe={10}] box={11}",
+                        Path.GetFileName(f), bmp.Width, bmp.Height, sw.Elapsed.TotalMilliseconds,
+                        st.ng, st.px[0], st.px[1], st.px[2],
+                        st.ncomp[0], st.ncomp[1], st.ncomp[2], st.nbox));
                 }
                 n++;
             }

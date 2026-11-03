@@ -33,6 +33,12 @@ struct Handle {
     SegPipeline pipe;
     cv::Mat lastInput;   // 原图副本（叠加图要用；copyTo 复用缓冲，不每帧重新分配）
     cv::Mat lastLabels;  // 最近一次 Forward 的 0/1/2 语义图
+    cv::Mat lastOverlay; // 叠加图输出缓冲，SegGetOverlay 每帧复用，不再 clone 原图
+    // computeStat 的复用缓冲：避免每帧重新分配数十 MB（statLabels 全图 CV_32S 约 31MB）
+    cv::Mat statBin;        // CV_8U  H x W，(labels == c) 的二值图
+    cv::Mat statLabels;     // CV_32S H x W，连通域标签
+    cv::Mat statStats;      // CV_32S N x 5
+    cv::Mat statCentroids;  // CV_64F N x 2
     bool loaded = false;
     bool statValid = false;
     SegStat stat{};
@@ -57,6 +63,15 @@ void computeStat(Handle* h) {
     }
     s.ng = (s.px[1] + s.px[2]) > 0 ? 1 : 0;
 
+    // 全背景（OK 品）：没有缺陷类像素，连通域结果必然为空，直接返回。
+    // 这一步能省掉两遍全图连通的扫描，是每帧最大的单项优化之一。
+    if (s.px[1] == 0 && s.px[2] == 0) {
+        s.ncomp[1] = 0;
+        s.ncomp[2] = 0;
+        s.nbox = 0;
+        return;
+    }
+
     struct Comp {
         int cls, x, y, w, h;
         long long px;
@@ -64,18 +79,25 @@ void computeStat(Handle* h) {
     std::vector<Comp> comps;
 
     for (int c = 1; c <= 2; ++c) {
-        const cv::Mat bin = (lab == c);  // 0/255 掩码
-        cv::Mat lbl, stats, centroids;
-        const int n = cv::connectedComponentsWithStats(bin, lbl, stats, centroids, 8, CV_32S);
+        if (s.px[c] == 0) {  // 该类没有像素，不必扫全图
+            s.ncomp[c] = 0;
+            continue;
+        }
+        // 复用 statBin/statLabels/statStats/statCentroids，避免每帧几十 MB 的分配。
+        // compare 对 8U 输入输出 8U（0/255），与原 (lab == c) 等价。
+        cv::compare(lab, cv::Scalar(c), h->statBin, cv::CMP_EQ);
+        const int n = cv::connectedComponentsWithStats(h->statBin, h->statLabels,
+                                                       h->statStats, h->statCentroids, 8,
+                                                       CV_32S);
         s.ncomp[c] = n > 0 ? n - 1 : 0;  // 0 号是背景连通域，不算
         for (int i = 1; i < n; ++i) {
             Comp cp;
             cp.cls = c;
-            cp.x = stats.at<int>(i, cv::CC_STAT_LEFT);
-            cp.y = stats.at<int>(i, cv::CC_STAT_TOP);
-            cp.w = stats.at<int>(i, cv::CC_STAT_WIDTH);
-            cp.h = stats.at<int>(i, cv::CC_STAT_HEIGHT);
-            cp.px = stats.at<int>(i, cv::CC_STAT_AREA);
+            cp.x = h->statStats.at<int>(i, cv::CC_STAT_LEFT);
+            cp.y = h->statStats.at<int>(i, cv::CC_STAT_TOP);
+            cp.w = h->statStats.at<int>(i, cv::CC_STAT_WIDTH);
+            cp.h = h->statStats.at<int>(i, cv::CC_STAT_HEIGHT);
+            cp.px = h->statStats.at<int>(i, cv::CC_STAT_AREA);
             comps.push_back(cp);
         }
     }
@@ -142,6 +164,11 @@ bool SegLoad(const char* enginePath, void* model) {
     h->statValid = false;
     h->lastInput.release();
     h->lastLabels.release();
+    h->lastOverlay.release();
+    h->statBin.release();
+    h->statLabels.release();
+    h->statStats.release();
+    h->statCentroids.release();
 
     try {
         std::string err;
@@ -195,6 +222,40 @@ int SegForward(unsigned char* bgrData, int width, int height, int stride, void* 
     return 0;
 }
 
+// 只推理、不保存原图、不生成叠加图。省掉 lastInput.copyTo 与后续 overlay 的全部开销。
+// 行为与 50 系列保持一致：不主动释放上一帧的 lastInput。
+int SegForwardMask(unsigned char* bgrData, int width, int height, int stride, void* model) {
+    Handle* h = asHandle(model);
+    if (!h) {
+        setError("SegForwardMask: null model handle");
+        return 1;
+    }
+    if (!h->loaded) {
+        setError("SegForwardMask: model not loaded (call SegLoad first)");
+        return 2;
+    }
+    if (!bgrData || width <= 0 || height <= 0 || stride <= 0) {
+        setError("SegForwardMask: bad image arguments");
+        return 3;
+    }
+
+    try {
+        // 直接引用调用方内存（LockBits 期间有效）；inferImage 内部不会长期持有它。
+        const cv::Mat src(height, width, CV_8UC3, bgrData, static_cast<std::size_t>(stride));
+        std::string err;
+        if (!h->pipe.inferImage(src, h->lastLabels, err)) {
+            setError("SegForwardMask: " + err);
+            return 4;
+        }
+    } catch (const std::exception& e) {
+        setError(std::string("SegForwardMask: ") + e.what());
+        return 5;
+    }
+
+    h->statValid = false;
+    return 0;
+}
+
 const char* SegGetOverlay(int& width, int& height, int& step, int& channels, void* model) {
     Handle* h = asHandle(model);
     if (!h || h->lastInput.empty() || h->lastLabels.empty()) {
@@ -202,8 +263,9 @@ const char* SegGetOverlay(int& width, int& height, int& step, int& channels, voi
         return nullptr;
     }
     try {
-        const cv::Mat ov = segOverlay(h->lastInput, h->lastLabels);
-        return copyOut(ov, width, height, step, channels);
+        // 写入复用的 lastOverlay，避免每帧 clone 一份 23MB 原图
+        segOverlayInto(h->lastInput, h->lastLabels, h->lastOverlay, 0.5f);
+        return copyOut(h->lastOverlay, width, height, step, channels);
     } catch (const std::exception& e) {
         setError(std::string("SegGetOverlay: ") + e.what());
         return nullptr;

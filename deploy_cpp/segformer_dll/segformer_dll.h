@@ -49,6 +49,11 @@ SEG_API bool  SegLoad(const char* enginePath, void* model);
 // 返回 0 表示成功，非 0 失败（原因见 SegLastError）。
 SEG_API int   SegForward(unsigned char* bgrData, int width, int height, int stride, void* model);
 
+// 同 SegForward，但只做推理，不保存原图、不生成叠加图。调用方只需要 mask / 统计时用它，
+// 每帧可省掉一次原图拷贝和一次叠加图生成（约 23MB 级）。
+// 注意：与 50 系列行为保持一致——不主动清空上一帧的 lastInput。
+SEG_API int   SegForwardMask(unsigned char* bgrData, int width, int height, int stride, void* model);
+
 // ---- 取结果图（调用方负责 SegFreeImage）--------------------------------
 // 叠加图：原图上把缺陷区域上色（与 seg_infer.exe --eval 输出、与 PyTorch 参考叠加图同一实现）
 SEG_API const char* SegGetOverlay(int& width, int& height, int& step, int& channels, void* model);

@@ -55,6 +55,7 @@ typedef void*       (*SegCreate_t)();
 typedef void        (*SegDestroy_t)(void*);
 typedef bool        (*SegLoad_t)(const char*, void*);
 typedef int         (*SegForward_t)(unsigned char*, int, int, int, void*);
+typedef int         (*SegForwardMask_t)(unsigned char*, int, int, int, void*);
 typedef const char* (*SegGetOverlay_t)(int&, int&, int&, int&, void*);
 typedef const char* (*SegGetMask_t)(int&, int&, int&, int&, void*);
 typedef void        (*SegFreeImage_t)(const char*);
@@ -68,6 +69,7 @@ struct DllApi {
     SegDestroy_t    Destroy = nullptr;
     SegLoad_t       Load = nullptr;
     SegForward_t    Forward = nullptr;
+    SegForwardMask_t ForwardMask = nullptr;   // 可选：旧 DLL 没有该导出
     SegGetOverlay_t GetOverlay = nullptr;
     SegGetMask_t    GetMask = nullptr;
     SegFreeImage_t  FreeImage = nullptr;
@@ -89,11 +91,16 @@ struct DllApi {
                          GetLastError(), dllPath.c_str());
             return false;
         }
-        return grab("SegCreate", Create) && grab("SegDestroy", Destroy) &&
-               grab("SegLoad", Load) && grab("SegForward", Forward) &&
-               grab("SegGetOverlay", GetOverlay) && grab("SegGetMask", GetMask) &&
-               grab("SegFreeImage", FreeImage) && grab("SegGetStat", GetStat) &&
-               grab("SegStatSize", StatSize) && grab("SegLastError", LastError);
+        if (!(grab("SegCreate", Create) && grab("SegDestroy", Destroy) &&
+              grab("SegLoad", Load) && grab("SegForward", Forward) &&
+              grab("SegGetOverlay", GetOverlay) && grab("SegGetMask", GetMask) &&
+              grab("SegFreeImage", FreeImage) && grab("SegGetStat", GetStat) &&
+              grab("SegStatSize", StatSize) && grab("SegLastError", LastError))) {
+            return false;
+        }
+        // --forwardmask 是新增导出；旧版 DLL 没有它，不影响其它模式。
+        ForwardMask = reinterpret_cast<SegForwardMask_t>(GetProcAddress(h, "SegForwardMask"));
+        return true;
     }
     ~DllApi() { if (h) FreeLibrary(h); }
 };
@@ -158,7 +165,12 @@ static void printMem(const char* tag) {
 
 // 逐图推理 + 存图 + 统计。返回 0 成功。
 static int runImages(DllApi& a, const std::string& engine, const std::vector<std::string>& files,
-                     const std::string& outDir, bool wantMask, bool wantStat) {
+                     const std::string& outDir, bool wantMask, bool wantStat,
+                     bool forwardMask) {
+    if (forwardMask && !a.ForwardMask) {
+        std::fprintf(stderr, "[ERR] 该 DLL 没有 SegForwardMask 导出\n");
+        return 1;
+    }
     void* model = a.Create();
     if (!model) { std::fprintf(stderr, "[ERR] SegCreate 失败: %s\n", dllErr(a).c_str()); return 1; }
     if (!a.Load(engine.c_str(), model)) {
@@ -186,19 +198,25 @@ static int runImages(DllApi& a, const std::string& engine, const std::vector<std
 
         LARGE_INTEGER f, t0, t1; QueryPerformanceFrequency(&f);
         QueryPerformanceCounter(&t0);
-        const int rc = a.Forward(img.data, img.cols, img.rows, (int)img.step, model);
+        const int rc = forwardMask
+            ? a.ForwardMask(img.data, img.cols, img.rows, (int)img.step, model)
+            : a.Forward(img.data, img.cols, img.rows, (int)img.step, model);
         QueryPerformanceCounter(&t1);
         const double ms = (t1.QuadPart - t0.QuadPart) * 1000.0 / f.QuadPart;
         totalMs += ms;
 
-        if (rc != 0) { std::fprintf(stderr, "  [ERR] SegForward rc=%d: %s\n", rc, dllErr(a).c_str()); continue; }
+        if (rc != 0) { std::fprintf(stderr, "  [ERR] SegForward%s rc=%d: %s\n",
+                                    forwardMask ? "Mask" : "", rc, dllErr(a).c_str()); continue; }
         std::printf("  [%zu/%zu] %s  %.0f ms\n", i + 1, files.size(), stem.c_str(), ms);
 
-        if (!outDir.empty()) {
+        if (!outDir.empty() && !forwardMask) {
             int w, h, step, ch;
             const char* ov = a.GetOverlay(w, h, step, ch, model);
             cv::Mat ovm = takeImage(a, ov, w, h, step, ch);
             if (!ovm.empty()) cv::imwrite((fs::path(outDir) / (stem + ".png")).string(), ovm);
+        }
+        if (!outDir.empty()) {
+            int w, h, step, ch;
             if (wantMask) {
                 const char* mk = a.GetMask(w, h, step, ch, model);
                 cv::Mat mkm = takeImage(a, mk, w, h, step, ch);
@@ -356,7 +374,7 @@ int main(int argc, char** argv) {
 
     std::vector<std::string> pos;
     std::string dllPath, valFull, soakInput;
-    bool mask = false, eval = false, stat = true, soak = false;
+    bool mask = false, eval = false, stat = true, soak = false, forwardMask = false;
     int soakIters = 0;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -364,6 +382,7 @@ int main(int argc, char** argv) {
         else if (a == "--eval") { eval = true; if (i + 1 < argc) valFull = argv[++i]; }
         else if (a == "--dll") { if (i + 1 < argc) dllPath = argv[++i]; }
         else if (a == "--no-forward-stat") stat = false;
+        else if (a == "--forwardmask") forwardMask = true;
         else if (a == "--soak") {
             soak = true;
             if (i + 1 < argc) soakInput = argv[++i];
@@ -378,7 +397,7 @@ int main(int argc, char** argv) {
     }
     if (pos.empty()) {
         std::printf("用法:\n"
-                    "  seg_test.exe <engine> <图或目录> <输出目录> [--mask] [--dll <dll>]\n"
+                    "  seg_test.exe <engine> <图或目录> <输出目录> [--mask] [--forwardmask] [--dll <dll>]\n"
                     "  seg_test.exe <engine> --eval <val_full.txt> [--dll <dll>]\n"
                     "  seg_test.exe <engine> --soak <图或目录> <迭代次数> [--dll <dll>]\n");
         return 2;
@@ -398,5 +417,5 @@ int main(int argc, char** argv) {
     }
     if (eval) return runEval(api, engine, valFull, stat);
     if (pos.size() < 3) { std::fprintf(stderr, "[ERR] 需要 <engine> <输入> <输出目录>\n"); return 2; }
-    return runImages(api, engine, listImages(pos[1]), pos[2], mask, stat);
+    return runImages(api, engine, listImages(pos[1]), pos[2], mask, stat, forwardMask);
 }

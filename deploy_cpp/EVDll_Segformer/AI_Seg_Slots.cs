@@ -77,6 +77,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg2:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg2:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -170,6 +195,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg3:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg3:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg3:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -269,6 +319,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg4:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg4:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -362,6 +437,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg5:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg5:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg5:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -461,6 +561,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg6:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg6:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -554,6 +679,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg7:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg7:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg7:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -653,6 +803,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg8:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg8:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -746,6 +921,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg9:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg9:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg9:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -845,6 +1045,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg10:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg10:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -938,6 +1163,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg11:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg11:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg11:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -1037,6 +1287,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg12:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg12:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -1130,6 +1405,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg13:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg13:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg13:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -1229,6 +1529,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg14:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg14:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -1322,6 +1647,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg15:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg15:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg15:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -1421,6 +1771,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg16:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg16:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -1514,6 +1889,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg17:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg17:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg17:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -1613,6 +2013,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg18:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg18:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -1706,6 +2131,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg19:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg19:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg19:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -1805,6 +2255,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg20:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg20:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -1898,6 +2373,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg21:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg21:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg21:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -1997,6 +2497,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg22:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg22:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -2090,6 +2615,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg23:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg23:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg23:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -2189,6 +2739,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg24:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg24:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -2282,6 +2857,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg25:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg25:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg25:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -2381,6 +2981,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg26:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg26:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -2474,6 +3099,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg27:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg27:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg27:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -2573,6 +3223,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg28:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg28:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -2666,6 +3341,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg29:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg29:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg29:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -2765,6 +3465,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg30:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg30:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -2858,6 +3583,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg31:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg31:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg31:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -2957,6 +3707,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg32:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg32:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -3050,6 +3825,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg33:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg33:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg33:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -3149,6 +3949,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg34:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg34:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -3242,6 +4067,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg35:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg35:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg35:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -3341,6 +4191,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg36:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg36:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -3434,6 +4309,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg37:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg37:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg37:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -3533,6 +4433,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg38:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg38:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -3626,6 +4551,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg39:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg39:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg39:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -3725,6 +4675,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg40:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg40:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -3818,6 +4793,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg41:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg41:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg41:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -3917,6 +4917,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg42:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg42:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -4010,6 +5035,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg43:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg43:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg43:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -4109,6 +5159,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg44:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg44:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -4202,6 +5277,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg45:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg45:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg45:AI RunMask报错：" + e;
+                return false;
             }
         }
 
@@ -4301,6 +5401,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg46:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg46:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -4397,6 +5522,31 @@ namespace EVDll_Segformer
             }
         }
 
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg47:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg47:AI RunMask报错：" + e;
+                return false;
+            }
+        }
+
         public static Bitmap GetMask()
         {
             return _model == null ? null : _model.GetMask();
@@ -4490,6 +5640,31 @@ namespace EVDll_Segformer
             {
                 ErroMessage = "AI_Seg48:AI Run报错：" + e;
                 return new Bitmap(10, 10);
+            }
+        }
+
+        // 只推理、不生成叠加图：只需要 mask / 统计时用它，省掉每帧的叠加图开销。
+        public static bool RunMask(Bitmap bitmap)
+        {
+            string dummy = null;
+            return RunMask(bitmap, ref dummy);
+        }
+
+        public static bool RunMask(Bitmap bitmap, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "AI_Seg48:模型未打开";
+                return false;
+            }
+            try
+            {
+                return _model.RunMask(bitmap);
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "AI_Seg48:AI RunMask报错：" + e;
+                return false;
             }
         }
 

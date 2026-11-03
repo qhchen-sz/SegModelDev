@@ -59,7 +59,7 @@ private:
         int ph, pw;   // 有效区域（padding 之前）的尺寸
     };
 
-    // 幂等释放 dIn_/dOut_/hIn_/hOut_/stream_/upBuf_。析构与重复 init() 共用。
+    // 幂等释放 dIn_/dOut_/hIn_/hOut_/stream_/upBuf_/acc_。析构与重复 init() 共用。
     void release();
 
     void collectTiles(int H, int W, std::vector<Tile>& out) const;
@@ -80,6 +80,9 @@ private:
     float* hOut_ = nullptr;      // pinned 主机内存；pageable 内存会让
                                  // cudaMemcpyAsync 退化成同步拷贝，实测这是大头
     std::vector<float> upBuf_;   // 上采样中转缓冲，供并行 resize 写入
+    // [numClasses] CV_32F，原图尺寸。跨帧复用：尺寸不变时 create 是空操作，
+    // 只做 setTo(0)，避免每帧重新分配约 3*H*W*4 字节（3000x2600 约 94MB）。
+    std::vector<cv::Mat> acc_;
 
     double lastMs_ = 0.0;
 };
@@ -92,3 +95,8 @@ private:
 // segformer_Dll_func.dll 实际返回给软件的图**是同一份实现**，
 // 否则「用 --eval 验证 DLL 的可视化是否正确」这条验证链就断了。
 cv::Mat segOverlay(const cv::Mat& bgr, const cv::Mat& labels, float alpha = 0.5f);
+
+// 同上，但把结果写进调用方提供的 dst 并复用其内存（DLL 每帧取叠加图时用，
+// 避免每帧 clone 一份原图）。dst 尺寸/类型不符时自动 create。
+void segOverlayInto(const cv::Mat& bgr, const cv::Mat& labels, cv::Mat& dst,
+                    float alpha = 0.5f);
