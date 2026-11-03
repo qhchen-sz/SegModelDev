@@ -7,8 +7,8 @@
   因此本工程只须在 DLL 编好之后编译；运行时需要 DLL 及其依赖
   (nvinfer_10.dll / cuDNN 9 / cudart 12.9 等) 能被找到 —— 见 run_seg_test.bat。
 
-  输出与 DLL 放在同一目录（segformer_dll50\），seg_test.exe 默认就从 exe 同级
-  加载 segformer_Dll_func.dll。
+  输出与 DLL 放在同一目录（x64\Debug\ 或 x64\Release\），seg_test.exe 默认就从
+  exe 同级加载 segformer_Dll_func.dll。
 
   Debug|x64 与 Release|x64 均提供。
 -->
@@ -32,9 +32,9 @@
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
 
-  <!-- 与 segformer_dll.vcxproj 相同：换机器只改 OpenCvBuild -->
+  <!-- 与 segformer_dll.vcxproj 相同的 OpenCV 布局：换机器只改 OpenCvRoot -->
   <PropertyGroup Label="UserMacros">
-    <OpenCvBuild>E:\opencv_exe\opencv\build</OpenCvBuild>
+    <OpenCvRoot>C:\Users\Univo\opencv\opencv\build</OpenCvRoot>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -62,17 +62,18 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
 
+  <!-- 与 DLL 同一输出目录：x64\<Configuration>\，保证 seg_test.exe 能就近加载 DLL -->
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>seg_test</TargetName>
-    <OutDir>$(ProjectDir)Debug\</OutDir>
-    <IntDir>$(ProjectDir)obj\$(Configuration)\</IntDir>
+    <OutDir>$(ProjectDir)x64\Debug\</OutDir>
+    <IntDir>$(ProjectDir)obj\seg_test\Debug\</IntDir>
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetName>seg_test</TargetName>
-    <OutDir>$(ProjectDir)</OutDir>
-    <IntDir>$(ProjectDir)obj\$(Configuration)\</IntDir>
+    <OutDir>$(ProjectDir)x64\Release\</OutDir>
+    <IntDir>$(ProjectDir)obj\seg_test\Release\</IntDir>
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
 
@@ -86,12 +87,12 @@
       <ExceptionHandling>Sync</ExceptionHandling>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;_CONSOLE;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(OpenCvBuild)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OpenCvRoot)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(OpenCvBuild)\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OpenCvRoot)\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <!-- Debug 链 OpenCV debug 库，理由同 segformer_dll.vcxproj -->
       <AdditionalDependencies>opencv_world480d.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
@@ -107,12 +108,12 @@
       <ExceptionHandling>Sync</ExceptionHandling>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;_CONSOLE;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(OpenCvBuild)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OpenCvRoot)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(OpenCvBuild)\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OpenCvRoot)\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>opencv_world480.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>

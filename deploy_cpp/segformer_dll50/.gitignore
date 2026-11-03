@@ -1,0 +1,7 @@
+.vs/
+**obj/
+Debug/
+Release/
+x64/
+**64/
+ab_out/

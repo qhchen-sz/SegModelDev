@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  EVDll_Segformer —— SegFormer 语义分割的 C# 调用层。
+  刻意保持与 D:\CaoJiaoJie\EVDll\EVDll.csproj 相同的形态：
+  .NET Framework 4.8 / x64 / OutputType=Library / 输出到 dll\ 。
+  只引用 System + System.Drawing（不需要 Halcon / OpenCvSharp）。
+-->
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <ProjectGuid>{A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>EVDll_Segformer</RootNamespace>
+    <AssemblyName>EVDll_Segformer</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <WarningLevel>4</WarningLevel>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <!-- Debug 仅供 VS 里调试用；实际交付用 Release（原生的 segformer_Dll_func.dll
+       只有 Release|x64，因为它链接的 TensorRT / OpenCV 都是 Release 库）。 -->
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+    <OutputPath>dll\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <OutputPath>dll\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AI_Seg.cs" />
+    <Compile Include="AI_Seg_Slots.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <!-- 版本号不写在源码里：每次编译前由 GenerateGitVersion 调用 git 生成
+       obj\...\GitVersion.g.cs（AssemblyVersion/FileVersion/InformationalVersion），
+       并动态加入编译列表，所以 VS 与 build_csharp.bat 构建都会带上版本标识。 -->
+  <Target Name="GenerateGitVersion" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <GitVersionFile>$(IntermediateOutputPath)GitVersion.g.cs</GitVersionFile>
+    </PropertyGroup>
+    <!-- 版本名 = 最近一次提交短哈希（有未提交改动时 git 自动追加 -dirty） -->
+    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; describe --always --dirty"
+          ConsoleToMSBuild="true" IgnoreExitCode="true" ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_GitDescribe" />
+      <Output TaskParameter="ExitCode" PropertyName="_GitDescribeCode" />
+    </Exec>
+    <Exec Command="&quot;F:\HymsonSoftWare\Git\bin\git.exe&quot; -C &quot;$(MSBuildProjectDirectory)&quot; describe --always --dirty"
+          ConsoleToMSBuild="true" IgnoreExitCode="true" ContinueOnError="WarnAndContinue"
+          Condition="'$(_GitDescribeCode)' != '0'">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_GitDescribe" />
+      <Output TaskParameter="ExitCode" PropertyName="_GitDescribeCode" />
+    </Exec>
+    <!-- 提交计数 N，作为文件版本号 1.0.0.N 的第 4 段（随每次提交递增） -->
+    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; rev-list --count HEAD"
+          ConsoleToMSBuild="true" IgnoreExitCode="true" ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_GitCount" />
+      <Output TaskParameter="ExitCode" PropertyName="_GitCountCode" />
+    </Exec>
+    <Exec Command="&quot;F:\HymsonSoftWare\Git\bin\git.exe&quot; -C &quot;$(MSBuildProjectDirectory)&quot; rev-list --count HEAD"
+          ConsoleToMSBuild="true" IgnoreExitCode="true" ContinueOnError="WarnAndContinue"
+          Condition="'$(_GitCountCode)' != '0'">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_GitCount" />
+      <Output TaskParameter="ExitCode" PropertyName="_GitCountCode" />
+    </Exec>
+    <PropertyGroup>
+      <_GitVersionName Condition="'$(_GitDescribeCode)' == '0'">$([System.String]::Copy('$(_GitDescribe)').Trim())</_GitVersionName>
+      <_GitVersionName Condition="'$(_GitDescribeCode)' != '0'">unknown</_GitVersionName>
+      <_GitCommitCount Condition="'$(_GitCountCode)' == '0'">$([System.String]::Copy('$(_GitCount)').Trim())</_GitCommitCount>
+      <_GitCommitCount Condition="'$(_GitCountCode)' != '0'">0</_GitCommitCount>
+      <_GitVersionLines>// &lt;auto-generated/&gt; Generated by the GenerateGitVersion MSBuild target from the latest git commit. Do not edit.;[assembly: System.Reflection.AssemblyVersion(&quot;1.0.0.0&quot;)];[assembly: System.Reflection.AssemblyFileVersion(&quot;1.0.0.$(_GitCommitCount)&quot;)];[assembly: System.Reflection.AssemblyInformationalVersion(&quot;$(_GitVersionName)&quot;)]</_GitVersionLines>
+    </PropertyGroup>
+    <Warning Text="[GitVersion] git 不可用，DLL 版本标识退化为 unknown / 1.0.0.0"
+             Condition="'$(_GitDescribeCode)' != '0'" />
+    <!-- 与旧文件内容比对，只有变化才重写，避免每次构建都全量重编译 -->
+    <ReadLinesFromFile File="$(GitVersionFile)" Condition="Exists('$(GitVersionFile)')">
+      <Output TaskParameter="Lines" PropertyName="_GitVersionOld" />
+    </ReadLinesFromFile>
+    <WriteLinesToFile File="$(GitVersionFile)" Overwrite="true" Lines="$(_GitVersionLines)"
+                      Condition="'$(_GitVersionOld)' != '$(_GitVersionLines)'" />
+    <ItemGroup>
+      <Compile Include="$(GitVersionFile)" />
+      <FileWrites Include="$(GitVersionFile)" />
+    </ItemGroup>
+  </Target>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

@@ -16,14 +16,16 @@
   - Release：交付用。Optimization=MaxSpeed，运行时库 MultiThreadedDLL(/MD)。
   - Debug  ：调试用。Optimization=Disabled，运行时库 MultiThreadedDebugDLL(/MDd)。
 
-  【换机器要改的三处】
-  - TrtRoot      ：TensorRT 10.10 SDK 根目录（含 include\ 与 lib\）
-  - OpenCvBuild  ：OpenCV build 目录（vc16）
-  - CUDA         ：走 $(CUDA_PATH)；编译用 CUDA 12.x 头/库即可，
-                   运行时必须是 CUDA 12.9 + cuDNN 9（见 run_seg_test.bat）
+  【换机器要改的几处】
+  - TrtRoot   ：TensorRT 10.10 SDK 根目录（含 include\ 与 lib\，
+                lib\ 里同时有 nvinfer_10.lib 等导入库与运行时 DLL）
+  - OpenCvRoot：OpenCV 4.8 的 build 目录，含 include\opencv2 与
+                x64\vc16\lib（opencv_world480.lib / opencv_world480d.lib）
+  - CudnnRoot ：cuDNN 9 根目录（含 include\ 与 lib\12.9\x64\）
+  - CUDA      ：走 $(CUDA_PATH)；编译用 CUDA 12.x 头/库即可，
+                运行时必须是 CUDA 12.9 + cuDNN 9（见 run_seg_test.bat）
 -->
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
@@ -34,38 +36,36 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-
   <PropertyGroup Label="Globals">
     <ProjectGuid>{C3D4E5F6-A7B8-4C9D-8E1F-2A3B4C5D6E7F}</ProjectGuid>
     <RootNamespace>segformer_dll</RootNamespace>
     <Keyword>Win32Proj</Keyword>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
-
-  <!-- 依赖根目录。TrtRoot 必须是 TensorRT 10.x SDK（不是 E:\Tensorrt\TensorRT-8.6.1.6）；
-       与 AIRTX50\gpu_Dll_func 使用同一个 10.10.0.31 安装目录。
-       CUDA 走 $(CUDA_PATH) 环境变量。 -->
+  <!-- 依赖根目录。TrtRoot 必须是 TensorRT 10.x SDK（不是 TensorRT 8.6）；
+       CUDA 走 $(CUDA_PATH) 环境变量（本机 v12.9）。 -->
   <PropertyGroup Label="UserMacros">
-    <TrtRoot>D:\Rtx50Test\TensorRT-10.10.0.31</TrtRoot>
-    <OpenCvBuild>E:\opencv_exe\opencv\build</OpenCvBuild>
+    <TrtRoot>C:\Users\Univo\TensorRT-10.10.0.31</TrtRoot>
+    <!-- OpenCV 4.8：标准 build 布局。include\ 下是头文件（include\opencv2）；
+         Release import lib（opencv_world480.lib）与 Debug import lib
+         （opencv_world480d.lib）都在 x64\vc16\lib；运行时 DLL 在 x64\vc16\bin。 -->
+    <OpenCvRoot>C:\Users\Univo\opencv\opencv\build</OpenCvRoot>
+    <!-- cuDNN 9.11（与 CUDA 12.9 配套）。CUDA 本身走 $(CUDA_PATH) = v12.9。 -->
+    <CudnnRoot>C:\Program Files\NVIDIA\CUDNN\v9.11</CudnnRoot>
   </PropertyGroup>
-
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings" />
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -74,23 +74,21 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-
-  <!-- Release 直接输出到本目录（交付物就在 segformer_dll50\）；
-       Debug 放 Debug\ 子目录，避免误把 Debug DLL 当 Release 交付。 -->
+  <!-- 产物统一放 x64\<Configuration>\（与参考工程 gpu_Dll_func 一致），
+       Debug/Release 物理隔离，根目录不再出现 DLL/EXE。
+       IntDir 按工程名再分一层，避免 segformer_dll 与 seg_test 共用中间目录。 -->
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>segformer_Dll_func</TargetName>
-    <OutDir>$(ProjectDir)Debug\</OutDir>
-    <IntDir>$(ProjectDir)obj\$(Configuration)\</IntDir>
+    <OutDir>$(ProjectDir)x64\Debug\</OutDir>
+    <IntDir>$(ProjectDir)obj\segformer_dll\Debug\</IntDir>
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
-
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetName>segformer_Dll_func</TargetName>
-    <OutDir>$(ProjectDir)</OutDir>
-    <IntDir>$(ProjectDir)obj\$(Configuration)\</IntDir>
+    <OutDir>$(ProjectDir)x64\Release\</OutDir>
+    <IntDir>$(ProjectDir)obj\segformer_dll\Release\</IntDir>
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
-
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -102,21 +100,24 @@
       <ExceptionHandling>Sync</ExceptionHandling>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;SEGFORMER_DLL_EXPORTS;_WINDOWS;_USRDLL;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(TrtRoot)\include;$(CUDA_PATH)\include;$(OpenCvBuild)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(TrtRoot)\include;$(CUDA_PATH)\include;$(CudnnRoot)\include;$(OpenCvRoot)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(TrtRoot)\lib;$(CUDA_PATH)\lib\x64;$(OpenCvBuild)\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(TrtRoot)\lib;$(CUDA_PATH)\lib\x64;$(CudnnRoot)\lib\12.9\x64;$(OpenCvRoot)\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <!-- Debug 必须链 OpenCV 的 **debug 库** opencv_world480d.lib：
            否则 _DEBUG 下 OpenCV 头把类型放进 cv::debug_build_guard 命名空间，
            与 Release 库的符号对不上 -> LNK2019(cv::resize 等)。运行时对应
-           opencv_world480d.dll（在 build\x64\vc16\bin 下，run_seg_test.bat 的 PATH 已含该目录）。 -->
+           opencv_world480d.dll（在 x64\vc16\bin 下，run_seg_test.bat 的 PATH 已含该目录）。 -->
       <!-- TensorRT 10 的 import lib 带 _10 后缀；本 DLL 只用运行时 API，不链接 nvonnxparser -->
-      <AdditionalDependencies>nvinfer_10.lib;cudart.lib;opencv_world480d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>nvinfer_10.lib;cudart.lib;cudnn64_9.lib;opencv_world480d.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <!-- 版本资源引用 $(IntDir)\build_version.h（编译前由 GenerateBuildVersion 生成） -->
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
   </ItemDefinitionGroup>
-
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -127,16 +128,19 @@
       <ExceptionHandling>Sync</ExceptionHandling>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;SEGFORMER_DLL_EXPORTS;_WINDOWS;_USRDLL;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(TrtRoot)\include;$(CUDA_PATH)\include;$(OpenCvBuild)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(TrtRoot)\include;$(CUDA_PATH)\include;$(CudnnRoot)\include;$(OpenCvRoot)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(TrtRoot)\lib;$(CUDA_PATH)\lib\x64;$(OpenCvBuild)\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>nvinfer_10.lib;cudart.lib;opencv_world480.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(TrtRoot)\lib;$(CUDA_PATH)\lib\x64;$(CudnnRoot)\lib\12.9\x64;$(OpenCvRoot)\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>nvinfer_10.lib;cudart.lib;cudnn64_9.lib;opencv_world480.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <!-- 版本资源引用 $(IntDir)\build_version.h（编译前由 GenerateBuildVersion 生成） -->
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
   </ItemDefinitionGroup>
-
   <!-- 推理内核改为本目录副本（自包含）；与 ..\src 下同名文件保持同步 -->
   <ItemGroup>
     <ClCompile Include="segformer_dll.cpp" />
@@ -145,10 +149,43 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="segformer_dll.h" />
+    <ClInclude Include="seg_profile.h" />
     <ClInclude Include="trt_engine.hpp" />
     <ClInclude Include="seg_pipeline.hpp" />
   </ItemGroup>
-
+  <ItemGroup>
+    <ResourceCompile Include="segformer_dll.rc" />
+  </ItemGroup>
+  <!-- 编译前生成版本头：编译日期/时间、编译机器名、日期版本号。
+       版本号 YYYY.M.D.50，末段 50 = RTX 50 版本标识。
+       写入 $(IntDir)（obj\<工程>\<配置>\），随配置隔离且不进版本库。 -->
+  <Target Name="GenerateBuildVersion" BeforeTargets="ResourceCompile" DependsOnTargets="PrepareForBuild">
+    <PropertyGroup>
+      <_SegBuildYear>$([System.DateTime]::Now.Year)</_SegBuildYear>
+      <_SegBuildMonth>$([System.DateTime]::Now.Month)</_SegBuildMonth>
+      <_SegBuildDay>$([System.DateTime]::Now.Day)</_SegBuildDay>
+      <_SegBuildDate>$([System.DateTime]::Now.ToString("yyyy-MM-dd"))</_SegBuildDate>
+      <_SegBuildTime>$([System.DateTime]::Now.ToString("HH:mm:ss"))</_SegBuildTime>
+      <_SegBuildMachine>$([System.Environment]::MachineName)</_SegBuildMachine>
+      <_SegBuildFileFlags Condition="'$(Configuration)'=='Debug'">0x1L</_SegBuildFileFlags>
+      <_SegBuildFileFlags Condition="'$(Configuration)'=='Release'">0x0L</_SegBuildFileFlags>
+    </PropertyGroup>
+    <ItemGroup>
+      <_SegBuildLine Include="// Auto-generated by GenerateBuildVersion -- do not edit." />
+      <_SegBuildLine Include="#define SEG_BUILD_VERSION_YEAR $(_SegBuildYear)" />
+      <_SegBuildLine Include="#define SEG_BUILD_VERSION_MONTH $(_SegBuildMonth)" />
+      <_SegBuildLine Include="#define SEG_BUILD_VERSION_DAY $(_SegBuildDay)" />
+      <_SegBuildLine Include="#define SEG_BUILD_VERSION_RTX 50" />
+      <_SegBuildLine Include="#define SEG_BUILD_VERSION_STRING &quot;$(_SegBuildYear).$(_SegBuildMonth).$(_SegBuildDay).50&quot;" />
+      <_SegBuildLine Include="#define SEG_BUILD_DATE &quot;$(_SegBuildDate)&quot;" />
+      <_SegBuildLine Include="#define SEG_BUILD_TIME &quot;$(_SegBuildTime)&quot;" />
+      <_SegBuildLine Include="#define SEG_BUILD_TIMESTAMP &quot;$(_SegBuildDate) $(_SegBuildTime)&quot;" />
+      <_SegBuildLine Include="#define SEG_BUILD_MACHINE &quot;$(_SegBuildMachine)&quot;" />
+      <_SegBuildLine Include="#define SEG_BUILD_COMMENTS &quot;Build $(_SegBuildDate) $(_SegBuildTime) on $(_SegBuildMachine) | TensorRT 10.10 / CUDA 12.9 / cuDNN 9.11 / OpenCV 4.8&quot;" />
+      <_SegBuildLine Include="#define SEG_BUILD_FILEFLAGS $(_SegBuildFileFlags)" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(IntDir)build_version.h" Lines="@(_SegBuildLine)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>

@@ -12,28 +12,35 @@ REM  Usage:
 REM    run_seg_test.bat <engine> <image or dir> <out dir> [--mask]
 REM    run_seg_test.bat <engine> --eval <val_full.txt>
 REM
+REM  The exe lives in x64\Release\ by default. For a Debug build run:
+REM    set SEG_CFG=Debug
+REM    run_seg_test.bat ...
+REM
 REM  Paths to adjust when moving to another machine:
 REM    TRT      = TensorRT 10.10 SDK root
-REM    CUDART   = CUDA 12.9 + cuDNN 9 runtime DLL directory
-REM               (on this machine: AIRTX50\Debug50 bundle, which has all of them)
-REM    OCV      = OpenCV build directory (vc16)
+REM    CUDNN    = cuDNN 9 runtime DLL directory (bin\12.9)
+REM    CUDA     = CUDA 12.9 runtime DLL directory (bin)
+REM    OCV      = OpenCV 4.8 DLL directory (has opencv_world480[d].dll)
 REM
 REM  ASCII-only on purpose (cmd.exe parses .bat with OEM codepage 936/GBK).
 REM ============================================================
 
 set "HERE=%~dp0"
 
-set "TRT=D:\Rtx50Test\TensorRT-10.10.0.31"
-set "CUDART=D:\CaoJiaoJie\AIRTX50\Debug50"
-set "OCV=E:\opencv_exe\opencv\build"
+set "TRT=C:\Users\Univo\TensorRT-10.10.0.31"
+set "CUDNN=C:\Program Files\NVIDIA\CUDNN\v9.11\bin\12.9"
+set "CUDA=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\bin"
+set "OCV=C:\Users\Univo\opencv\opencv\build\x64\vc16\bin"
 
-set "EXE=%HERE%seg_test.exe"
+if not defined SEG_CFG set "SEG_CFG=Release"
+set "BIN=%HERE%x64\%SEG_CFG%"
+set "EXE=%BIN%\seg_test.exe"
 if not exist "%EXE%" (
-    echo [ERROR] %EXE% not found -- build segformer_dll.sln first.
+    echo [ERROR] %EXE% not found -- build segformer_dll.sln ^(%SEG_CFG%^|x64^) first.
     exit /b 1
 )
 
-set "PATH=%HERE%;%TRT%\lib;%TRT%\bin;%CUDART%;%OCV%\x64\vc16\bin;%PATH%"
+set "PATH=%BIN%;%TRT%\lib;%TRT%\bin;%CUDNN%;%CUDA%;%OCV%;%PATH%"
 
 "%EXE%" %*
 exit /b %errorlevel%

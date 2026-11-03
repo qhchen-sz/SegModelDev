@@ -55,6 +55,7 @@ typedef void*       (*SegCreate_t)();
 typedef void        (*SegDestroy_t)(void*);
 typedef bool        (*SegLoad_t)(const char*, void*);
 typedef int         (*SegForward_t)(unsigned char*, int, int, int, void*);
+typedef int         (*SegForwardMask_t)(unsigned char*, int, int, int, void*);
 typedef const char* (*SegGetOverlay_t)(int&, int&, int&, int&, void*);
 typedef const char* (*SegGetMask_t)(int&, int&, int&, int&, void*);
 typedef void        (*SegFreeImage_t)(const char*);
@@ -68,6 +69,7 @@ struct DllApi {
     SegDestroy_t    Destroy = nullptr;
     SegLoad_t       Load = nullptr;
     SegForward_t    Forward = nullptr;
+    SegForwardMask_t ForwardMask = nullptr;   // 可选导出：旧 DLL 没有时回退到 Forward
     SegGetOverlay_t GetOverlay = nullptr;
     SegGetMask_t    GetMask = nullptr;
     SegFreeImage_t  FreeImage = nullptr;
@@ -89,6 +91,8 @@ struct DllApi {
                          GetLastError(), dllPath.c_str());
             return false;
         }
+        // 可选导出：缺失时不报错，--runmask 自动回退到 SegForward
+        ForwardMask = reinterpret_cast<SegForwardMask_t>(GetProcAddress(h, "SegForwardMask"));
         return grab("SegCreate", Create) && grab("SegDestroy", Destroy) &&
                grab("SegLoad", Load) && grab("SegForward", Forward) &&
                grab("SegGetOverlay", GetOverlay) && grab("SegGetMask", GetMask) &&
@@ -217,7 +221,7 @@ static int runImages(DllApi& a, const std::string& engine, const std::vector<std
 // 判别标准：iter 10 之后各次内存快照应基本持平；reload 前后也应基本持平。
 // （修复前每次 SegLoad 会漏掉整份引擎 + 约 160 MB 流水线缓冲，快照会阶梯式上涨。）
 static int runSoak(DllApi& a, const std::string& engine, const std::string& input,
-                   int iters) {
+                   int iters, bool useMask) {
     std::vector<cv::Mat> imgs;
     for (const auto& f : listImages(input)) {
         cv::Mat m = cv::imread(f, cv::IMREAD_COLOR);
@@ -226,6 +230,11 @@ static int runSoak(DllApi& a, const std::string& engine, const std::string& inpu
     if (imgs.empty()) {
         std::fprintf(stderr, "[ERR] soak 没有可用图片: %s\n", input.c_str());
         return 1;
+    }
+
+    const bool mask = useMask && a.ForwardMask != nullptr;
+    if (useMask && !a.ForwardMask) {
+        std::printf("[soak] 当前 DLL 没有 SegForwardMask 导出，回退到 SegForward\n");
     }
 
     void* model = a.Create();
@@ -238,13 +247,16 @@ static int runSoak(DllApi& a, const std::string& engine, const std::string& inpu
         a.Destroy(model);
         return 1;
     }
-    std::printf("[soak] %d 次迭代, %zu 张图\n", iters, imgs.size());
+    std::printf("[soak] %d 次迭代, %zu 张图, 路径=%s\n", iters, imgs.size(),
+                mask ? "SegForwardMask" : "SegForward");
     printMem("load 后");
 
     int errors = 0;
     for (int i = 0; i < iters; ++i) {
         const cv::Mat& img = imgs[static_cast<std::size_t>(i) % imgs.size()];
-        const int rc = a.Forward(img.data, img.cols, img.rows, static_cast<int>(img.step), model);
+        const int rc = mask
+            ? a.ForwardMask(img.data, img.cols, img.rows, static_cast<int>(img.step), model)
+            : a.Forward(img.data, img.cols, img.rows, static_cast<int>(img.step), model);
         if (rc != 0) {
             std::fprintf(stderr, "[ERR] SegForward rc=%d: %s\n", rc, dllErr(a).c_str());
             ++errors;
@@ -274,8 +286,12 @@ static int runSoak(DllApi& a, const std::string& engine, const std::string& inpu
         char tag[32];
         std::snprintf(tag, sizeof(tag), "reload %d 后", r);
         printMem(tag);
-        if (a.Forward(imgs[0].data, imgs[0].cols, imgs[0].rows,
-                      static_cast<int>(imgs[0].step), model) != 0) {
+        const int rc = mask
+            ? a.ForwardMask(imgs[0].data, imgs[0].cols, imgs[0].rows,
+                            static_cast<int>(imgs[0].step), model)
+            : a.Forward(imgs[0].data, imgs[0].cols, imgs[0].rows,
+                        static_cast<int>(imgs[0].step), model);
+        if (rc != 0) {
             std::fprintf(stderr, "[ERR] reload 后 Forward 失败: %s\n", dllErr(a).c_str());
             ++errors;
         }
@@ -356,7 +372,7 @@ int main(int argc, char** argv) {
 
     std::vector<std::string> pos;
     std::string dllPath, valFull, soakInput;
-    bool mask = false, eval = false, stat = true, soak = false;
+    bool mask = false, eval = false, stat = true, soak = false, runMask = false;
     int soakIters = 0;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -364,6 +380,7 @@ int main(int argc, char** argv) {
         else if (a == "--eval") { eval = true; if (i + 1 < argc) valFull = argv[++i]; }
         else if (a == "--dll") { if (i + 1 < argc) dllPath = argv[++i]; }
         else if (a == "--no-forward-stat") stat = false;
+        else if (a == "--runmask") runMask = true;   // soak 走软件实际路径（不生成叠加图）
         else if (a == "--soak") {
             soak = true;
             if (i + 1 < argc) soakInput = argv[++i];
@@ -380,7 +397,8 @@ int main(int argc, char** argv) {
         std::printf("用法:\n"
                     "  seg_test.exe <engine> <图或目录> <输出目录> [--mask] [--dll <dll>]\n"
                     "  seg_test.exe <engine> --eval <val_full.txt> [--dll <dll>]\n"
-                    "  seg_test.exe <engine> --soak <图或目录> <迭代次数> [--dll <dll>]\n");
+                    "  seg_test.exe <engine> --soak <图或目录> <迭代次数> [--dll <dll>] "
+                    "[--runmask]\n");
         return 2;
     }
     const std::string engine = pos[0];
@@ -394,7 +412,7 @@ int main(int argc, char** argv) {
             std::fprintf(stderr, "[ERR] 用法: seg_test.exe <engine> --soak <图或目录> <迭代次数>\n");
             return 2;
         }
-        return runSoak(api, engine, soakInput, soakIters);
+        return runSoak(api, engine, soakInput, soakIters, runMask);
     }
     if (eval) return runEval(api, engine, valFull, stat);
     if (pos.size() < 3) { std::fprintf(stderr, "[ERR] 需要 <engine> <输入> <输出目录>\n"); return 2; }
