@@ -1,6 +1,6 @@
 # 极耳缺陷分割实验报告总览
 
-> 本文档汇总 `D:\qhchen\NewModel\newsiliec9` 与 `D:\qhchen\NewModel\ADevFolder` 两个工程中的实验与部署报告，按**报告内容所对应的实验日期**排序归档，共 11 份。每份报告说明"做了什么、关键配置是什么、取得了什么结果、结论是什么"，并给出与源码、权重、数据集的对应关系。
+> 本文档汇总 `D:\qhchen\NewModel\newsiliec9`、`D:\qhchen\NewModel\ADevFolder` 与 `D:\qhchen\NewModel\hefeic1` 三个工程中的实验与部署报告，按**报告内容所对应的实验日期**排序归档，共 12 份（其中 `11A` 为 RF-DETR 对比子编号）。每份报告说明"做了什么、关键配置是什么、取得了什么结果、结论是什么"，并给出与源码、权重、数据集的对应关系。
 
 ---
 
@@ -8,10 +8,10 @@
 
 | 项 | 说明 |
 |---|---|
-| 报告来源 | `newsiliec9`（实验主目录，2026-09 ~ 2026-10）与 `ADevFolder`（当前工程，含最新 RTX50 适配版） |
+| 报告来源 | `newsiliec9`（实验主目录，2026-09 ~ 2026-10）、`ADevFolder`（当前工程，含最新 RTX50 适配版与 rfdetr 实验）、`hefeic1`（正/侧面产线数据与 SegFormer more 模型） |
 | 排序依据 | 报告内容中的实验/生成日期；无显式日期的取文件生成时间，并在下表中标注 |
 | 去重规则 | 两工程同名的 7 份报告只保留一份；内容完全一致或仅换行符/路径差异的直接去重；RTX50 报告保留当前工程 2026-11-02 最新版 |
-| 文件命名 | `序号_日期_主题.md`，序号即时间顺序，按文件名排序即可还原时间线 |
+| 文件命名 | `序号_日期_主题.md`，序号即时间顺序；同一天或交叉支线用 `11A` 子编号，不重排已有文件。注意 `11A` 对应 2026-10-30，应排在 `11`（2026-11-02）之前阅读，但文件系统按 ASCII 排序会把它排在 `11_` 之后，**请以文件名中的日期为准** |
 | 原文处理 | 原样复制，未修改报告正文；原工程文件均保留未动 |
 
 ---
@@ -30,7 +30,7 @@
 
 原始数据共 **446 张**，其中缺陷图约 239 张，其余为负样本（全背景，约 207~210 张，不同划分的统计口径略有差异）。silie 实例明显少于 fanzhe（旧划分下 silie 110 个实例、fanzhe 296 个实例）。
 
-### 2.2 两套数据划分（重要）
+### 2.2 数据划分（重要）
 
 实验过程中先后使用过两套划分，**绝对指标不可跨套比较**：
 
@@ -46,13 +46,15 @@
 | train_strat | 357 | 83 / 49 | 241 / 142 | 168 | 47.1% |
 | val_strat | 89 | 27 / 12 | 55 / 35 | 42 | 47.2% |
 
-> 结论：**09-25 之后的所有对比（报告 04~11）均基于分层划分从零重训**。09-21~09-23 的旧划分结果只能用于说明当时的选择过程，不能与后期数字直接横向比较。
+> 结论：**09-25 之后的所有对比（报告 04~11、11A）均基于分层划分从零重训**。09-21~09-23 的旧划分结果只能用于说明当时的选择过程，不能与后期数字直接横向比较。
+>
+> 注意：hefeic1 的正/侧面数据是另一套独立数据（zhengmian 301 张、cemian 232 张），与上述 446 张极耳数据不重叠；报告 11A 的指标不能与报告 01~10 的数字横向比较。
 
 ---
 
 ## 三、时间线与演进脉络
 
-整个研究分为六个阶段，每一阶段的结论直接决定下一步做什么：
+整个研究分为六个阶段和一条并行支线，每一阶段的结论直接决定下一步做什么：
 
 ### 阶段一：基线选型与 SegFormer v2 改进（2026-09-21 ~ 09-23）
 
@@ -87,6 +89,13 @@
 - **做法**：在 val_strat 89 张上统一评估 S4、v2-fast、YOLO 的 per-class IoU / Recall / Precision 和推理速度。
 - **结果**：S4 mIoU 0.7593、mRecall 0.8449、mPrecision 0.8610；v2-fast mIoU 0.7531；YOLO mIoU 0.5205。S4 以召回略降为代价换取精确率和 IoU 提升，综合最优。
 - **下一步动因**：模型指标已定，进入 C++/TensorRT 部署。
+
+### 阶段五支线：RF-DETR 检测路线探索（2026-10-29 ~ 10-30）
+
+- **问题**：SegFormer 是语义分割，输出像素 mask；尝试用更新的检测架构 RF-DETR 直接检测 silie/fanzhe 框，验证检测路线在正/侧面数据上的可行性。
+- **做法**：在 hefeic1 的 zhengmian（241/60）与 cemian（185/47）合并划分上，用 YOLO 框标注生成 COCO 数据集，训练 RFDETRBase（DINOv2 编码器、1120 全图、2 类），早停 patience=100；同数据的 SegFormer `sw_s4_more` 作为分割侧参照。
+- **结果**：RF-DETR 最佳 EMA mAP@0.5 为 zhengmian 0.6682 / cemian 0.8158，mAP@0.5:0.95 为 0.3489 / 0.5081；SegFormer `sw_s4_more` combined mIoU 为 0.7471 / 0.7893，负样本假阳 0 / 394.8 px/图。
+- **结论**：两者任务口径不同（检测 mAP vs 分割 mIoU），**不能直接排名**；RF-DETR 未记录 per-class AP、负样本假阳和推理速度，silie 能力与工程代价尚无法判定。详见报告 11A。
 
 ### 阶段六：C++ / TensorRT 部署与 RTX50 适配（2026-10-22 ~ 11-02）
 
@@ -159,6 +168,33 @@
 | sw_s4 C#→C++ DLL | 0.7593 | 0.5820 | 1988.0 | 59740 | 205 ms（含封送） |
 | v2_strat PyTorch | 0.7531 | 0.5611 | 11394 | 211461 | 811.1 ms |
 | v2_strat TensorRT FP16 | 0.7531 | 0.5611 | — | — | 156.3 ms |
+
+### 4.6 hefeic1 正/侧面：RF-DETR（检测）与 SegFormer `sw_s4_more`（分割）
+
+> **两套指标口径不同，禁止跨列比较或排名。** RF-DETR 是 COCO bbox mAP，SegFormer 是像素 IoU；两者验证集相同（zhengmian 60 张、cemian 47 张）。
+
+**RF-DETR 框级结果（EMA best，combined valid）**
+
+| 视角 | 最佳 epoch | mAP@0.5 | mAP@0.5:0.95 | mAP@0.75 | mAR | Precision | Recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| zhengmian | 60 | 0.6682 | 0.3489 | 0.3277 | 0.5913 | 0.7571 | 0.6458 | 0.6970 |
+| cemian | 73 | 0.8158 | 0.5081 | 0.5618 | 0.7071 | 0.9655 | 0.6292 | 0.7597 |
+
+**SegFormer `sw_s4_more` 像素级结果（combined valid）**
+
+| 视角 | mIoU | silie IoU | fanzhe IoU | fanzhe P/R | 负样本假阳均值/最大 | PyTorch 耗时 | C++ TRT FP16 |
+|---|---:|---:|---:|---|---:|---:|---:|
+| zhengmian | 0.7471 | 0.5691 | 0.6907 | 0.844/0.792 | **0 / 0** | 1089.6 ms | 263.0 ms（GPU 忙）/ 约 100 ms |
+| cemian | 0.7893 | 0.6111 | 0.7670 | 0.853/0.884 | 394.8 / 5520 | 491.4 ms | 100.7 ms |
+
+**旧 `sw_s4` 参考（combined valid，说明数据扩充增益）**
+
+| 视角 | mIoU | silie IoU | fanzhe IoU | 负样本假阳均值 |
+|---|---:|---:|---:|---:|
+| zhengmian | 0.7285 | 0.5264 | 0.6793 | 9557.6 |
+| cemian | 0.7029 | 0.5931 | 0.5352 | 2652.3 |
+
+> RF-DETR 未记录 per-class AP、负样本假阳和推理耗时；因此上表只能说明各自任务下的表现，不能回答"谁更优"。
 
 ---
 
@@ -264,6 +300,18 @@
 
 ---
 
+### 11A · 2026-10-30 · [RF-DETR 与 SegFormer 在 hefeic1 正/侧面数据上的对比](11A_2026-10-30_RF-DETR与SegFormer对比.md)
+
+**做了什么**：在 hefeic1 的 zhengmian（241/60）与 cemian（185/47）合并划分上，把 YOLO 框标注转成 COCO 数据集，训练 RF-DETR 检测模型（RFDETRBase、DINOv2 编码器、1120 全图、2 类 silie/fanzhe、早停 patience=100）；同数据的 SegFormer `sw_s4_more` 作为分割侧参照。两者验证集完全对齐。
+
+**RF-DETR 结果**：最佳 EMA 指标 zhengmian mAP@0.5 0.6682、mAP@0.5:0.95 0.3489、F1 0.6970，训练到 ep160（best 60 + patience 100）；cemian mAP@0.5 0.8158、mAP@0.5:0.95 0.5081、F1 0.7597，训练到 ep173（best 73 + patience 100）。按配置推断已早停。不同指标的最佳 epoch 不一致（zhengmian mAP50 最佳 ep53、F1 最佳 ep68；cemian mAP50 最佳 ep64、F1 最佳 ep59），存在 ±0.02~0.03 波动。
+
+**SegFormer 结果**：`sw_s4_more` combined 验证集 zhengmian mIoU 0.7471 / silie 0.5691 / fanzhe 0.6907 / 负样本假阳 0；cemian mIoU 0.7893 / silie 0.6111 / fanzhe 0.7670 / 负样本假阳 394.8 px/图。旧 `sw_s4` 分别为 0.7285 / 0.7029，负样本假阳 9557.6 / 2652.3，说明数据扩充带来明显改善。C++ TRT FP16 与 PyTorch 差 ≤0.0002。
+
+**结论**：两者是检测与分割两种任务，**不能直接比数值**。RF-DETR 在 cemian 上框级 mAP50 有 0.8158，但本次未记录 per-class AP、负样本假阳和推理耗时，silie 小目标（验证集仅 6/12 个）的实际检出与过杀水平无法判定；因此本报告不构成两条路线的优劣排名。若业务需要缺陷面积/斑点分析，SegFormer 的 mask 仍是更直接的方案。
+
+---
+
 ### 11 · 2026-11-02 · [RTX 50 系列适配报告](11_2026-11-02_RTX50适配报告.md)
 
 **做了什么**：把 TensorRT 8.6 版 C++ 工程移植到 RTX 50 平台（TensorRT 10.10.0.31 + CUDA 12.9 + cuDNN 9），导出接口、`SegStat` 布局、DLL 文件名保持不变，C# 层无需改动。初版（2026-10-23）完成 TRT10 编译适配后，11-02 版新增了 batch>1 数值错误的排查与多流并发方案。
@@ -290,19 +338,22 @@
 | 08 | `newsiliec9/final_report.md` | `segformer_v2/eval_final_report.py` | `val_strat.txt`、`runs_strat/sw_s4/best`、`runs_strat/v2_strat/best`、YOLO `runs_strat/train_strat/weights/best.pt` |
 | 09 | `newsiliec9/deploy_cpp/README.md` | `segformer_v2/export_best_onnx.py`、`deploy_cpp/tools/build_engine.bat`、`build.bat`、`run.bat`、`EVDll_Segformer/build_csharp.bat` | `deploy_cpp/models/segformer_sw_s4_b1_640.onnx` / `*.engine`、`dataset_strat/val_full.txt` |
 | 10 | `newsiliec9/deploy_cpp/SOP_ENGINE_EXPORT.md` | `deploy_cpp/tools/build_engine.bat`、`trtexec`、`run.bat`、`SegTest.bat` | 同报告 09；目标机 TensorRT 版本须与软件 `dll/nvinfer.dll` 一致 |
+| 11A | `ADevFolder/rfdetr/runs/{zhengmian,cemian}_base1120/metrics.csv`、`training_config.json`；`hefeic1/{view}/validation_results_more/summary.md`、`SOP_{view}_more.md` | `rfdetr/make_coco.py`、`train_rfdetr.py`、`infer_rfdetr.py`；SegFormer 侧 `hefeic1/{view}/scripts/eval_compare_more.py` | `rfdetr/datasets/{view}/{train,valid}/_annotations.coco.json`、`rfdetr/runs/{view}_base1120/checkpoint_best_ema.pth`、`hefeic1/{view}/runs_strat/sw_s4_more/best`、`hefeic1/{view}/dataset_strat_more/val_full.txt` |
 | 11 | `ADevFolder/deploy_cpp/segformer_dll50/README_RTX50.md`（最新版） | `deploy_cpp/segformer_dll50/segformer_dll.sln`、`build_engine50.bat`、`run_seg_test.bat`、`trt_engine.cpp`、`seg_pipeline.cpp` | `deploy_cpp/models/*.onnx`、`deploy_cpp/models50/*.engine`（在 RTX50 机器上构建） |
 
 ---
 
 ## 七、口径与使用注意
 
-1. **两套划分不可横向比较**：报告 01~03 使用旧划分（train 负样本 1.6%、val 46.6%，排除约 163 张负样本）；报告 04~11 使用分层划分（train/val 负样本 47.1%/47.2%）。同一模型在两套划分上的 mIoU 差异主要来自数据分布，不是模型变化。
+1. **三套数据不可横向比较**：报告 01~03 使用旧划分（train 负样本 1.6%、val 46.6%，排除约 163 张负样本）；报告 04~11 使用 446 张极耳数据的分层划分（train/val 负样本 47.1%/47.2%）；报告 11A 使用 hefeic1 的正/侧面独立数据（zhengmian 301 张、cemian 232 张），且 RF-DETR 用 more 划分（241/60、185/47）。三套数据的指标不能横向比较。
 2. **mIoU 与 mask mAP 不可直接比**：SegFormer/Mask2Former 与 YOLO 的像素级指标是"把预测转成语义图后算 per-class IoU"，而 YOLO 原生 mask mAP 是实例级指标，两者不能混用。
 3. **速度对比需看设置**：YOLO 为 imgsz=1200 单次推理；SegFormer 为全图滑窗（不同 stride/TTA/batch/精度差异很大）。报告中标注"仅供参考"的速度数字，不要直接作为最终选型依据。跨报告的速度数字（例如 YOLO 73.8 ms 与 16~19 ms）测量批次不同，也不完全可比。
 4. **v2 / v2-fast / v2_strat / sw_s4 的关系**：v2-fast 与 v2 是**同一份权重**，仅推理策略不同（bs16 + FP16 + stride448 + 无 TTA）；`v2_strat` 即 v2 基线权重；`sw_s4` 是超参扫描 S4 点训练出的权重，架构同为 SegFormer-B1。
 5. **训练期 tile mIoU ≠ 全图 mIoU**：`final_miou.txt` 中的 0.7651 是训练期切块评估口径，部署/全图评估的对应值是 0.7593~0.7594，不能直接对比。
-6. **日期依据**：报告 01~05、07、08 原文未标注生成日期，归档日期取自文件生成时间；报告 06 标注 2026-10-10；报告 09、10 标注最后更新 2026-10-22；报告 11 初版 2026-10-23，归档采用当前工程 2026-11-02 更新版。
+6. **日期依据**：报告 01~05、07、08 原文未标注生成日期，归档日期取自文件生成时间；报告 06 标注 2026-10-10；报告 09、10 标注最后更新 2026-10-22；报告 11 初版 2026-10-23，归档采用当前工程 2026-11-02 更新版；报告 11A 的实验日期取 RF-DETR 训练产物时间 2026-10-30。
 7. **RTX50 两版差异**：`newsiliec9` 中的 10-23 初版只完成 TRT10 编译适配；当前工程 11-02 版新增 batch>1 数值错误的排查结论、固定 batch=1 引擎和 4 路多流并发方案，归档取最新版，旧版未重复收录。
+8. **检测 mAP 与分割 mIoU 是两种指标**：RF-DETR 的 mAP 评价"框是否框住目标且类别正确"，SegFormer 的 IoU 评价"每个像素类别是否正确"；两者没有换算关系，报告 11A 中分列展示，不做排名。
+9. **报告 11A 的未测项**：RF-DETR 的 per-class AP（silie/fanzhe 分开）、负样本假阳、推理耗时、训练时长均未记录或未测；silie 在验证集仅 6/12 个目标，总体 mAP 可能被 fanzhe 主导，引用时需保留这些限定。
 
 ---
 
@@ -314,6 +365,7 @@
 - **部署**：TensorRT 8.6.1.6 FP16 在 RTX 3090 上 mIoU 0.7594、155.2 ms/图，假阳削减完整保留；C#→C++ DLL 路径精度一致，205 ms（含封送）。
 - **RTX50**：TensorRT 10.10 下必须用固定 batch=1 引擎 + 多流并发，避免 batch>1 的数值错误。
 - **与 YOLO 对比**：YOLO 速度约快 43~48 倍，但在分层验证集上 silie IoU 仅 0.1291，现场漏杀批漏检 7 张真实翻折，过杀批出现大面积整块误报；SegFormer 在缺陷召回和假阳控制上明显更优。
+- **hefeic1 正/侧面**：SegFormer `sw_s4_more` 仍是唯一完成像素级验证与产线部署的方案（zhengmian combined mIoU 0.7471、负样本假阳 0；cemian 0.7893、假阳 394.8 px/图）。RF-DETR 检测路线在 cemian 上框级 mAP@0.5 0.8158，但缺少 per-class AP、过杀统计和速度，暂不能与分割路线定论。
 
 ### 8.2 已提出但未实施的后续方向
 
@@ -322,6 +374,8 @@
 - **v2 + 后处理组合**：保留 v2 的精度，用后处理压假阳。
 - **DLL 零拷贝接口**（报告 09 提出）：当前 DLL 路径比 exe 路径多约 55 ms 的全图内存拷贝，若要进一步提速可改造接口。
 - **RTX50 速度实测**：报告 11 给出了 `SEGFORMER_WORKERS=1/2/4/6` 的对比方法，但尚未记录具体耗时结果，建议在目标机补齐。
+- **RF-DETR 补测**（报告 11A 提出）：用 `checkpoint_best_ema.pth` 重跑 COCO per-class AP（重点 silie）、统计 8/14 张负样本图的误检、实测推理耗时；若要与 SegFormer 严格比较，再把 mask 转连通域框或在同一检测口径下复评。
+- **两条路线选型**：若最终需要缺陷面积/斑点分析，优先保留 SegFormer；若只需要"有无 + 位置"的快速筛查，待 RF-DETR 补测证明 silie 与过杀可接受后再评估。
 
 ### 8.3 相关但未归档的内容
 
@@ -329,3 +383,6 @@
 - `segformer_baseline/README.md`：SegFormer-B1 基线方案设计说明，非实验对比报告。
 - `deploy_cpp/papers/paper_source.md`：SegFormer 论文出处核查笔记。
 - `fix50_batch16_bug.txt`、`segformer_readme.txt`：非 md 的过程记录；git 提交 `abce3cd`（修复 50 系 batch16 推理不一致）、`711e89e`（EV 时间波动与速度优化）、`4fc52cf`（迁移 50 系优化到 30 系）记录了 2026-10-31 ~ 11-03 的后续工作，但尚无独立实验报告。
+- `hefeic1/zhengmian/SOP_zhengmian.md`、`hefeic1/cemian/SOP_cemian.md`：基础 sw_s4 模型 SOP；`SOP_*_more.md` 是 `sw_s4_more` 的完整实验记录（数据扩充、训练、验证、C++ 复核、导出），内容已提炼进报告 11A，未单独归档。
+- `hefeic1/cemian1103/`：2026-11-03 重训的侧面模型，数据与验证集（183 张 / val 59）与报告 11A 的 cemian more（232 张 / val 47）不同，不能同表比较，本次未纳入。
+- `rfdetr/runs/{view}_vis/`：RF-DETR 的检测框可视化图，未做系统漏检/误检分析，只作目检参考。
