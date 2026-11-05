@@ -15,6 +15,7 @@ import os
 os.environ.setdefault('HF_ENDPOINT', 'https://hf-mirror.com')
 import argparse
 import time
+import yaml
 import csv
 import glob
 import numpy as np
@@ -24,6 +25,7 @@ import torch.nn.functional as F
 from torch.amp import autocast
 from transformers import SegformerForSemanticSegmentation
 from pathlib import Path
+from postprocess import logits_to_labels, resolve_confidence_threshold
 
 # ---- 权重 ----
 V2_BEST = r"D:/qhchen/NewModel/ADevFolder/segformer_v2/runs_strat/v2_strat/best"
@@ -69,7 +71,7 @@ def batch_forward(model, patches_bgr):
     return lg.cpu().numpy()
 
 
-def seg_predict(model, img_bgr):
+def seg_predict(model, img_bgr, confidence_threshold=0.5):
     tiles, H, W = collect_tiles(img_bgr, TILE, STRIDE)
     acc = None
     cov = np.zeros((H, W), dtype=np.float32)
@@ -82,7 +84,7 @@ def seg_predict(model, img_bgr):
             acc[:, y0:y0 + ph, x0:x0 + pw] += logits[j][:, :ph, :pw]
             cov[y0:y0 + ph, x0:x0 + pw] += 1.0
     cov = np.maximum(cov, 1e-6)
-    return (acc / cov[None]).argmax(0).astype(np.uint8)
+    return logits_to_labels(acc / cov[None], confidence_threshold)
 
 
 def yolo_predict(yolo_model, img_bgr):
@@ -126,7 +128,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--img_dir', required=True)
     ap.add_argument('--out_dir', default=None)
+    ap.add_argument('--confidence-threshold', type=float, default=None)
     a = ap.parse_args()
+    cfg = yaml.safe_load(open(Path(__file__).parent / 'config_strat.yaml', encoding='utf-8'))
+    threshold = resolve_confidence_threshold(cfg, a.confidence_threshold)
 
     IMG_DIR = Path(a.img_dir.rstrip('/\\'))
     OUT = Path(a.out_dir) if a.out_dir else (IMG_DIR / '_results')
@@ -140,7 +145,7 @@ def main():
     imgs = sorted(glob.glob(str(IMG_DIR / '*.jpg')))
     assert imgs, f"无 jpg: {IMG_DIR}"
     n_img = len(imgs)
-    print(f"[{IMG_DIR.name}] {n_img} 张图 -> {OUT}", flush=True)
+    print(f"[{IMG_DIR.name}] {n_img} 张图 -> {OUT}, confidence_threshold={threshold}", flush=True)
 
     print(f"加载 v2-fast: {V2_BEST}", flush=True)
     v2 = SegformerForSemanticSegmentation.from_pretrained(V2_BEST).to(device).eval()
@@ -152,8 +157,8 @@ def main():
 
     # warmup
     w = cv2.imread(imgs[0])
-    seg_predict(v2, w)
-    seg_predict(v2b, w)
+    seg_predict(v2, w, threshold)
+    seg_predict(v2b, w, threshold)
     yolo_predict(yolo, w)
     if device == 'cuda':
         torch.cuda.synchronize()
@@ -179,8 +184,8 @@ def main():
     for i, ip in enumerate(imgs):
         name = Path(ip).name
         img = cv2.imread(ip)
-        p2, t2 = timeit(seg_predict, v2, img)
-        pb, tb = timeit(seg_predict, v2b, img)
+        p2, t2 = timeit(seg_predict, v2, img, threshold)
+        pb, tb = timeit(seg_predict, v2b, img, threshold)
         (py, n_inst), ty = timeit(yolo_predict, yolo, img)
 
         px = {
@@ -254,7 +259,7 @@ def main():
     L.append(f'# 三模型对比报告：v2-fast / v2b(B方案) / YOLOv8n-seg（{folder} | {n_img} 张全图，无 GT）\n')
     L.append('## 说明\n')
     L.append(f'- 本测试集 {n_img} 张图**无标注**，故 IoU/mAP 等真实精度指标 **N/A**。')
-    L.append('- 口径与 `compare_report_strat.md` 一致：v2-fast / v2b 同为 (bs16 fp16 stride448 tile640 noTTA)，仅权重不同；yolo (imgsz1200 conf0.25 iou0.5)。')
+    L.append(f'- 口径与 `compare_report_strat.md` 一致：v2-fast / v2b 同为 (bs16 fp16 stride448 tile640 noTTA, Softmax 置信度阈值 {threshold})，仅权重不同；yolo (imgsz1200 conf0.25 iou0.5)。')
     L.append('- v2-fast 权重 = `runs_strat/v2_strat/best`；v2b 权重 = `runs_strat/v2b_strat/best`。')
     L.append('- 两两一致性 IoU：值越高=两模型在缺陷区域越吻合；低=至少一个在误报。')
     L.append('- 叠加图(三套并对齐当前图片集)：`overlays_v2fast/`、`overlays_v2b/`、`overlays_yolo/`（silie红 / fanzhe蓝 / bg灰）。\n')

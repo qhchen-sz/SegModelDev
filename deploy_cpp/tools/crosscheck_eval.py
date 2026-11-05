@@ -32,6 +32,7 @@ ROOT = HERE.parent.parent                       # 工程根目录
 
 sys.path.insert(0, str(ROOT / 'segformer_v2'))
 import sweep_eval                               # noqa: E402  参考实现
+from postprocess import resolve_confidence_threshold  # noqa: E402
 
 
 def main():
@@ -40,14 +41,16 @@ def main():
     ap.add_argument('--val-full', required=True, help='val_full.txt（图<TAB>GT）')
     ap.add_argument('--out', required=True, help='label map 输出目录')
     ap.add_argument('--limit', type=int, default=-1)
+    ap.add_argument('--confidence-threshold', type=float, default=None)
     a = ap.parse_args()
+    threshold = resolve_confidence_threshold({}, a.confidence_threshold)
 
     os.makedirs(a.out, exist_ok=True)
     model = SegformerForSemanticSegmentation.from_pretrained(a.best).to('cuda').eval()
     lines = sweep_eval.load_val_full(a.val_full)
     if a.limit > 0:
         lines = lines[:a.limit]
-    print(f'crosscheck: {len(lines)} images, best={a.best}')
+    print(f'crosscheck: {len(lines)} images, best={a.best}, confidence_threshold={threshold}')
 
     inter = np.zeros(3, np.float64)
     union = np.zeros(3, np.float64)
@@ -57,7 +60,7 @@ def main():
         gt = cv2.imread(mp, cv2.IMREAD_UNCHANGED)
         torch.cuda.synchronize()
         t0 = time.time()
-        pred = sweep_eval.predict(model, img)
+        pred = sweep_eval.predict(model, img, threshold)
         torch.cuda.synchronize()
         times.append(time.time() - t0)
 

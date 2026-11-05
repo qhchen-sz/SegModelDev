@@ -6,15 +6,13 @@
 //   整图被判成背景），只有 batch=1 正确，因此这里固定 batch=1，改用 numWorkers 路
 //   execution context 并发来换吞吐。修改时不要再与本工程外的副本互相同步。
 //
-// 单块预处理/上采样/累加的语义仍与 infer_fast_strat.py 逐条对齐
-// （mIoU 0.7531 / silie 0.5611 / fanzhe 0.7081）：
+// 单块预处理、滑窗融合及置信度过滤与 infer_fast_strat.py 对齐：
 //
-//   collect_tiles       :28-42   -> collectTiles()
-//   预处理              :45-47   -> fillNCHW()
-//   推理                :48-52   -> forwardBatch()
-//   上采样 bilinear     :51       -> cv::resize(INTER_LINEAR)
-//   logits 累加/argmax  :64-69   -> inferImage()
-//   叠加图配色          :71-76   -> 见 main.cpp 的 overlay()
+//   collect_tiles              -> collectTiles()
+//   预处理                     -> fillNCHW()
+//   推理与上采样 bilinear      -> forwardBatch() / cv::resize(INTER_LINEAR)
+//   平均 logits / Softmax 过滤 -> inferImage()
+//   叠加图配色                 -> 见 main.cpp 的 overlay()
 
 #include <cuda_runtime.h>
 
@@ -39,6 +37,7 @@ struct SegConfig {
     int batch = 1;         // 每路前向的 batch（RTX50 必须为 1）
     int numWorkers = 4;    // 并发路数：每路独立 execution context + stream
     int numClasses = 3;    // 0 背景 / 1 silie / 2 fanzhe
+    float confidenceThreshold = 0.5f;  // Softmax 最大置信度低于此值时判为背景
 };
 
 class SegPipeline {
@@ -50,6 +49,7 @@ public:
     SegPipeline() = default;
 
     bool init(TrtEngine& eng, const SegConfig& cfg, std::string& err);
+    bool setConfidenceThreshold(float threshold, std::string& err);
 
     // 整图滑窗推理，labels 输出为 CV_8UC1、原图尺寸，取值 0/1/2
     bool inferImage(const cv::Mat& bgr, cv::Mat& labels, std::string& err);
@@ -112,7 +112,7 @@ private:
         int pTiles = 0;
     };
 
-    // 幂等释放所有 worker 的 stream/device/pinned 缓冲与 upAll_。析构与重复 init() 共用。
+    // 幂等释放所有 worker 的 stream/device/pinned 缓冲与 upAll_/cov_。析构与重复 init() 共用。
     // 注意：不销毁 ctx —— ctx 的生命周期由 TrtEngine（engine.load/teardown）管理。
     void release();
     void releaseWorkers();
@@ -137,6 +137,7 @@ private:
     // [numClasses] CV_32F，原图尺寸。每帧复用：尺寸不变时 create 是空操作，
     // 只做 setTo(0)，避免每帧重新分配约 3*H*W*4 字节（3000x2600 约 94MB）。
     std::vector<cv::Mat> acc_;
+    cv::Mat cov_;  // CV_32F，每个像素的有效滑窗覆盖次数
 
     // ---- 持久线程池 ----
     // 关键点：worker 线程在 init() 时创建、常驻到 release()。每帧只递增 poolSeq_
@@ -157,7 +158,7 @@ private:
     std::mutex errMtx_;
     std::string frameErr_;
 
-    // 池任务的第二种形态：按行动态分块（argmax / overlay 复用同一批常驻线程）。
+    // 池任务的第二种形态：按行动态分块（Softmax 后处理 / overlay 复用同一批常驻线程）。
     // 不再每帧 new std::thread —— 在 EasyVision 这类加载大量 DLL 的进程里，
     // CreateThread 的 DLL_THREAD_ATTACH 会带来数百毫秒的抖动。
     enum class PoolTask { Tiles, Rows };
@@ -208,7 +209,7 @@ void segOverlayInto(const cv::Mat& bgr, const cv::Mat& labels, cv::Mat& dst,
 // ============================================================================
 // 诊断日志：只在 SEGFORMER_PROFILE=1 时启用，默认关闭且不改变推理路径。
 //
-// 目的：把每帧拆成可对齐的段（清零 / 并行推理 / 累加 / argmax / 统计 / 取图），
+// 目的：把每帧拆成可对齐的段（清零 / 并行推理 / 累加 / Softmax 后处理 / 统计 / 取图），
 // 用于定位耗时波动来自哪一段。
 //
 // 输出 CSV，每行一个事件：

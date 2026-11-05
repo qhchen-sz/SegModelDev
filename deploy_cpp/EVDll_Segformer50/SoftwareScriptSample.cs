@@ -1,7 +1,7 @@
 // SegFormer 语义分割 —— 视觉软件脚本模板（可直接粘到软件的脚本编辑器里）。
 //
 // 与 YOLO 版（using EVDll; AI_Gpu1.Run(bmp, ref erro, conf, nms)）的唯一区别：
-// 分割模型没有置信度 / NMS 阈值，Run 只接收 Bitmap。
+// 分割模型的 Softmax 置信度阈值默认 0.5，低于阈值判为背景；Run 只接收 Bitmap，不做 NMS。
 //
 // 注意：Run 返回的是 3 通道叠加图（只能显示），斑点分析要用 GetMask 的
 // 单通道掩膜（0=背景 1=撕裂 2=翻折），阈值设为 1~2 即可。

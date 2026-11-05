@@ -45,6 +45,10 @@ SEG_API void  SegDestroy(void* model);
 // 加载 .engine；成功返回 true。失败时用 SegLastError() 取原因。
 SEG_API bool  SegLoad(const char* enginePath, void* model);
 
+// 设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景，等于阈值保留。
+// 可在 SegLoad 前或后调用；成功返回 true，非法阈值返回 false，原因见 SegLastError。
+SEG_API bool  SegSetConfidenceThreshold(void* model, float threshold);
+
 // 整图滑窗推理。bgrData 为 BGR/24bpp/带 stride 的原始像素。
 // 返回 0 表示成功，非 0 失败（原因见 SegLastError）。
 SEG_API int   SegForward(unsigned char* bgrData, int width, int height, int stride, void* model);

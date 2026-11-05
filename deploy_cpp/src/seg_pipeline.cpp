@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 
 namespace {
@@ -89,6 +90,16 @@ void SegPipeline::release() {
     }
     std::vector<float>().swap(upBuf_);   // 真正归还约 75 MB 的上采样中转缓冲
     std::vector<cv::Mat>().swap(acc_);   // 归还累加缓冲（cv::Mat 析构释放像素内存）
+    cov_.release();
+}
+
+bool SegPipeline::setConfidenceThreshold(float threshold, std::string& err) {
+    if (!std::isfinite(threshold) || threshold < 0.0f || threshold > 1.0f) {
+        err = "confidence threshold must be finite and in [0,1]";
+        return false;
+    }
+    cfg_.confidenceThreshold = threshold;
+    return true;
 }
 
 bool SegPipeline::init(TrtEngine& eng, const SegConfig& cfg, std::string& err) {
@@ -96,6 +107,7 @@ bool SegPipeline::init(TrtEngine& eng, const SegConfig& cfg, std::string& err) {
     release();
     eng_ = &eng;
     cfg_ = cfg;
+    if (!setConfidenceThreshold(cfg.confidenceThreshold, err)) return false;
 
     tile_ = eng.inputHeight();
     if (eng.inputWidth() != tile_) {
@@ -248,6 +260,8 @@ bool SegPipeline::inferImage(const cv::Mat& bgrIn, cv::Mat& labels, std::string&
         acc_[c].create(H, W, CV_32F);
         acc_[c].setTo(0);
     }
+    cov_.create(H, W, CV_32F);
+    cov_.setTo(0);
 
     const auto t0 = std::chrono::high_resolution_clock::now();
 
@@ -313,37 +327,46 @@ bool SegPipeline::inferImage(const cv::Mat& bgrIn, cv::Mat& labels, std::string&
         // 累加只能串行：stride(448) < tile(640)，相邻块的 ROI 是重叠的
         for (int j = 0; j < n; ++j) {
             const Tile& t = tiles[i + j];
+            const cv::Rect valid(t.x0, t.y0, t.pw, t.ph);
             for (int c = 0; c < cfg_.numClasses; ++c) {
                 const int idx = j * cfg_.numClasses + c;
                 cv::Mat up(tile_, tile_, CV_32F,
                            upBuf_.data() + static_cast<std::size_t>(idx) * tileHW);
-                cv::Mat roi = acc_[c](cv::Rect(t.x0, t.y0, t.pw, t.ph));
+                cv::Mat roi = acc_[c](valid);
                 roi += up(cv::Rect(0, 0, t.pw, t.ph));
             }
+            cov_(valid) += 1.0f;
         }
     }
 
-    // argmax：Python 是 argmax(acc/cov)，但 cov 对每个像素的三类相同，可约掉。
-    // cov 为 0 的像素三类都是 0 -> argmax 取 0（背景），与 Python 一致。
+    // Softmax 必须在平均 logits 上计算，覆盖次数不能在概率计算前约掉。
     labels.create(H, W, CV_8UC1);
     cv::parallel_for_(cv::Range(0, H), [&](const cv::Range& r) {
         for (int y = r.start; y < r.end; ++y) {
             const float* a0 = acc_[0].ptr<float>(y);
             const float* a1 = acc_[1].ptr<float>(y);
             const float* a2 = acc_.size() > 2 ? acc_[2].ptr<float>(y) : nullptr;
+            const float* cov = cov_.ptr<float>(y);
             uchar* out = labels.ptr<uchar>(y);
             for (int x = 0; x < W; ++x) {
+                const float invCov = 1.0f / std::max(cov[x], 1e-6f);
+                const float v0 = a0[x] * invCov;
+                const float v1 = a1[x] * invCov;
+                const float v2 = a2 ? a2[x] * invCov : 0.0f;
                 int best = 0;
-                float bv = a0[x];
-                if (a1[x] > bv) {
+                float bv = v0;
+                if (v1 > bv) {
                     best = 1;
-                    bv = a1[x];
+                    bv = v1;
                 }
-                if (a2 && a2[x] > bv) {
+                if (a2 && v2 > bv) {
                     best = 2;
-                    bv = a2[x];
+                    bv = v2;
                 }
-                out[x] = static_cast<uchar>(best);
+                float denom = std::exp(v0 - bv) + std::exp(v1 - bv);
+                if (a2) denom += std::exp(v2 - bv);
+                const float confidence = 1.0f / denom;
+                out[x] = static_cast<uchar>(confidence >= cfg_.confidenceThreshold ? best : 0);
             }
         }
     });

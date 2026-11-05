@@ -53,6 +53,7 @@ struct Handle {
     cv::Mat statLabels;     // CV_32S H x W，连通域标签
     cv::Mat statStats;      // CV_32S N x 5
     cv::Mat statCentroids;  // CV_64F N x 2
+    float confidenceThreshold = 0.5f;
     bool loaded = false;
     bool statValid = false;
     SegStat stat{};
@@ -167,6 +168,21 @@ void SegDestroy(void* model) {
     delete asHandle(model);
 }
 
+bool SegSetConfidenceThreshold(void* model, float threshold) {
+    Handle* h = asHandle(model);
+    if (!h) {
+        setError("SegSetConfidenceThreshold: null model handle");
+        return false;
+    }
+    std::string err;
+    if (!h->pipe.setConfidenceThreshold(threshold, err)) {
+        setError("SegSetConfidenceThreshold: " + err);
+        return false;
+    }
+    h->confidenceThreshold = threshold;
+    return true;
+}
+
 bool SegLoad(const char* enginePath, void* model) {
     Handle* h = asHandle(model);
     if (!h) {
@@ -197,6 +213,7 @@ bool SegLoad(const char* enginePath, void* model) {
             return false;
         }
         SegConfig cfg = kConfig;
+        cfg.confidenceThreshold = h->confidenceThreshold;
         if (const char* env = std::getenv("SEGFORMER_WORKERS")) {
             const int n = std::atoi(env);
             if (n >= 1 && n <= 16) cfg.numWorkers = n;

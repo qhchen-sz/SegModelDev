@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """把 v2 最优权重导出为 ONNX 单文件（部署级，可用 onnxruntime 直接推理，不依赖 transformers）。
 输入: pixel_values (B,3,H,W) float32, ImageNet 归一化
-输出: logits (B,3,H/4,W/4) float32 -> argmax 得 0/1/2 语义图
+输出: logits (B,3,H/4,W/4) float32；部署端先融合 logits，再做 Softmax 置信度过滤并生成 0/1/2 语义图
 动态 batch + 空间尺寸（SegFormer 全卷积，支持任意 H/W）。
 导出后用 onnxruntime 校验与 torch 输出一致。
 """
@@ -60,12 +60,13 @@ def main():
 
     print('\n部署推理示例 (onnxruntime):')
     print("  import numpy as np, onnxruntime as ort, cv2")
+    print("  from postprocess import logits_to_labels")
     print("  sess = ort.InferenceSession(r'%s', providers=['CUDAExecutionProvider','CPUExecutionProvider'])" % out)
     print("  mean=np.array([0.485,0.456,0.406]); std=np.array([0.229,0.224,0.225])")
     print("  img=cv2.cvtColor(cv2.imread('tile.jpg'), cv2.COLOR_BGR2RGB).astype(np.float32)/255")
     print("  x=((img-mean)/std).transpose(2,0,1)[None]")
     print("  logits=sess.run(None,{'pixel_values':x})[0]  # (1,3,H/4,W/4)")
-    print("  pred=np.argmax(logits,1)[0]  # 0/1/2 语义图")
+    print("  pred=logits_to_labels(logits[0],0.5)  # 单块时直接后处理；滑窗须先平均重叠区域 logits")
 
 if __name__ == '__main__':
     main()

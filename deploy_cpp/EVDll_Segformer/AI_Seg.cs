@@ -11,7 +11,8 @@
 //
 //     var st = AI_Seg1.GetStat();     // 缺陷判定：st.ng / st.px[] / st.box*
 //
-// 注意：分割模型没有置信度/NMS 阈值，所以 Run 不带 (conf, nms) 参数。
+// Softmax 置信度阈值默认 0.5，可在 Init 后通过 SegModel.SetConfidenceThreshold 调整；
+// Run 仍不带 (conf, nms) 参数，不做 NMS。
 
 using System;
 using System.Drawing;
@@ -37,6 +38,10 @@ namespace EVDll_Segformer
         [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.I1)]
         public static extern bool SegLoad(string enginePath, IntPtr model);
+
+        [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public static extern bool SegSetConfidenceThreshold(IntPtr model, float threshold);
 
         [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
         public static extern int SegForward(IntPtr bgrData, int width, int height, int stride,
@@ -118,6 +123,15 @@ namespace EVDll_Segformer
         public static int NativeStatSize() { return Native.SegStatSize(); }
 
         public bool IsOpen { get { return _handle != IntPtr.Zero; } }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public void SetConfidenceThreshold(float threshold)
+        {
+            if (_disposed) throw new ObjectDisposedException("SegModel");
+            if (_handle == IntPtr.Zero) throw new InvalidOperationException("模型未打开，请先 Init");
+            if (!Native.SegSetConfidenceThreshold(_handle, threshold))
+                throw new ArgumentException("置信度阈值必须是 [0,1] 内的有限数：" + LastError());
+        }
 
         public void Init(string enginePath)
         {

@@ -6,13 +6,14 @@ SegFormer v2 加速推理测试: 批量前向(bs16) + FP16 autocast + stride 448
 """
 import os
 os.environ.setdefault('HF_ENDPOINT', 'https://hf-mirror.com')
-import time, yaml
+import argparse, time, yaml
 import numpy as np
 import cv2, torch
 import torch.nn.functional as F
 from torch.amp import autocast
 from transformers import SegformerForSemanticSegmentation
 from pathlib import Path
+from postprocess import logits_to_labels, resolve_confidence_threshold
 
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
@@ -56,7 +57,7 @@ def batch_forward(model, patches_bgr, device, fp16):
     lg = F.interpolate(lg.float(), size=(TILE, TILE), mode='bilinear', align_corners=False)
     return lg.cpu().numpy()
 
-def sliding_predict_fast(model, img_bgr, device, fp16):
+def sliding_predict_fast(model, img_bgr, device, fp16, confidence_threshold=0.5):
     tiles, H, W = collect_tiles(img_bgr, TILE, STRIDE)
     nc = None
     acc = None; cov = np.zeros((H, W), dtype=np.float32)
@@ -73,7 +74,7 @@ def sliding_predict_fast(model, img_bgr, device, fp16):
             acc[:, y0:y0+ph, x0:x0+pw] += lg
             cov[y0:y0+ph, x0:x0+pw] += 1.0
     cov = np.maximum(cov, 1e-6)
-    return (acc / cov[None]).argmax(0).astype(np.uint8)
+    return logits_to_labels(acc / cov[None], confidence_threshold)
 
 def overlay(img, pred, alpha=0.5):
     ov = img.copy()
@@ -90,7 +91,11 @@ def iou(pred, gt, nc=3):
     return inter, union
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--confidence-threshold', type=float, default=None)
+    a = ap.parse_args()
     cfg = yaml.safe_load(open(Path(__file__).parent / 'config.yaml', encoding='utf-8'))
+    threshold = resolve_confidence_threshold(cfg, a.confidence_threshold)
     device = 'cuda'
     base = Path(cfg['project_root']) / 'segformer_v2'
     out = Path(cfg['out_dir']) / 'v2_fast'
@@ -100,13 +105,14 @@ def main():
     inter = np.zeros(3, dtype=np.float64); union = np.zeros(3, dtype=np.float64)
     times = []
     # warmup
-    _ = sliding_predict_fast(model, cv2.imread(lines[0][0]), device, FP16)
+    _ = sliding_predict_fast(model, cv2.imread(lines[0][0]), device, FP16, threshold)
     torch.cuda.synchronize()
-    print(f'fast infer {len(lines)} images (bs{BATCH} fp16={FP16} stride{STRIDE} noTTA) ...')
+    print(f'fast infer {len(lines)} images (bs{BATCH} fp16={FP16} stride{STRIDE} noTTA, '
+          f'confidence_threshold={threshold}) ...')
     for i, (ip, mp) in enumerate(lines):
         img = cv2.imread(ip); gt = cv2.imread(mp, cv2.IMREAD_UNCHANGED)
         torch.cuda.synchronize(); t0 = time.time()
-        pred = sliding_predict_fast(model, img, device, FP16)
+        pred = sliding_predict_fast(model, img, device, FP16, threshold)
         torch.cuda.synchronize(); times.append(time.time() - t0)
         a_i, b_i = iou(pred, gt); inter += a_i; union += b_i
         cv2.imwrite(str(ov_dir / (Path(ip).stem + '.png')), overlay(img, pred))
@@ -119,7 +125,8 @@ def main():
     with open(out / 'eval_result.txt', 'w', encoding='utf-8') as f:
         f.write(f'background_IoU={ious[0]:.4f}\nsilie_IoU={ious[1]:.4f}\nfanzhe_IoU={ious[2]:.4f}\n'
                 f'mIoU={ious.mean():.4f}\navg_inference_ms={avg_ms:.1f}\nnum_images={len(times)}\n'
-                f'config=bs{BATCH}_fp16{FP16}_stride{STRIDE}_noTTA\n')
+                f'config=bs{BATCH}_fp16{FP16}_stride{STRIDE}_noTTA\n'
+                f'confidence_threshold={threshold}\n')
 
 if __name__ == '__main__':
     main()

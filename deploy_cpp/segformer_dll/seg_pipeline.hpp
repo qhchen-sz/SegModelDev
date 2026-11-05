@@ -5,15 +5,13 @@
 //    两处必须保持一致：改这里请同步改 ..\src\seg_pipeline.hpp，反之亦然。
 //    （seg_infer.exe 使用 ..\src 下那一份；CMake 的 segformer_dll 目标与本 VS 工程使用本副本。）
 //
-// 这里是 infer_fast_strat.py 的 C++ 复刻，必须逐条对齐，否则 val_strat 上的
-// IoU 会对不上基线（mIoU 0.7531 / silie 0.5611 / fanzhe 0.7081）：
+// 这里复刻 infer_fast_strat.py 的滑窗与后处理，预处理及置信度阈值必须保持一致：
 //
-//   collect_tiles       :28-42   -> collectTiles()
-//   预处理              :45-47   -> fillNCHW()
-//   推理                :48-52   -> forwardBatch()
-//   上采样 bilinear     :51       -> cv::resize(INTER_LINEAR)
-//   logits 累加/argmax  :64-69   -> inferImage()
-//   叠加图配色          :71-76   -> 见 main.cpp 的 overlay()
+//   collect_tiles              -> collectTiles()
+//   预处理                     -> fillNCHW()
+//   推理与上采样 bilinear      -> forwardBatch() / cv::resize(INTER_LINEAR)
+//   平均 logits / Softmax 过滤 -> inferImage()
+//   叠加图配色                 -> 见 main.cpp 的 overlay()
 
 #include <cuda_runtime.h>
 
@@ -28,6 +26,7 @@ struct SegConfig {
     int stride = 448;      // 滑窗步长；tile 由引擎输入尺寸决定（本项目为 640）
     int batch = 16;        // 单次前向包含多少块
     int numClasses = 3;    // 0 背景 / 1 silie / 2 fanzhe
+    float confidenceThreshold = 0.5f;  // Softmax 最大置信度低于此值时判为背景
 };
 
 class SegPipeline {
@@ -39,6 +38,7 @@ public:
     SegPipeline() = default;
 
     bool init(TrtEngine& eng, const SegConfig& cfg, std::string& err);
+    bool setConfidenceThreshold(float threshold, std::string& err);
 
     // 整图滑窗推理，labels 输出为 CV_8UC1、原图尺寸，取值 0/1/2
     bool inferImage(const cv::Mat& bgr, cv::Mat& labels, std::string& err);
@@ -59,7 +59,7 @@ private:
         int ph, pw;   // 有效区域（padding 之前）的尺寸
     };
 
-    // 幂等释放 dIn_/dOut_/hIn_/hOut_/stream_/upBuf_/acc_。析构与重复 init() 共用。
+    // 幂等释放 dIn_/dOut_/hIn_/hOut_/stream_/upBuf_/acc_/cov_。析构与重复 init() 共用。
     void release();
 
     void collectTiles(int H, int W, std::vector<Tile>& out) const;
@@ -83,6 +83,7 @@ private:
     // [numClasses] CV_32F，原图尺寸。跨帧复用：尺寸不变时 create 是空操作，
     // 只做 setTo(0)，避免每帧重新分配约 3*H*W*4 字节（3000x2600 约 94MB）。
     std::vector<cv::Mat> acc_;
+    cv::Mat cov_;  // CV_32F，每个像素的有效滑窗覆盖次数
 
     double lastMs_ = 0.0;
 };

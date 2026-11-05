@@ -19,7 +19,7 @@
 namespace {
 
 // 与 sweep_eval.py 完全一致的口径：tile 由引擎决定(640)，stride 448，batch 16。
-// 刻意不暴露成可调参数——这是已验证的配置，调歪了只会静默掉精度。
+// Softmax 置信度阈值默认 0.5，可通过 SegSetConfidenceThreshold 调整。
 const SegConfig kConfig{};
 
 thread_local std::string tlsError;
@@ -39,6 +39,7 @@ struct Handle {
     cv::Mat statLabels;     // CV_32S H x W，连通域标签
     cv::Mat statStats;      // CV_32S N x 5
     cv::Mat statCentroids;  // CV_64F N x 2
+    float confidenceThreshold = 0.5f;
     bool loaded = false;
     bool statValid = false;
     SegStat stat{};
@@ -147,6 +148,21 @@ void SegDestroy(void* model) {
     delete asHandle(model);
 }
 
+bool SegSetConfidenceThreshold(void* model, float threshold) {
+    Handle* h = asHandle(model);
+    if (!h) {
+        setError("SegSetConfidenceThreshold: null model handle");
+        return false;
+    }
+    std::string err;
+    if (!h->pipe.setConfidenceThreshold(threshold, err)) {
+        setError("SegSetConfidenceThreshold: " + err);
+        return false;
+    }
+    h->confidenceThreshold = threshold;
+    return true;
+}
+
 bool SegLoad(const char* enginePath, void* model) {
     Handle* h = asHandle(model);
     if (!h) {
@@ -176,7 +192,9 @@ bool SegLoad(const char* enginePath, void* model) {
             setError("SegLoad: " + err);
             return false;
         }
-        if (!h->pipe.init(h->engine, kConfig, err)) {
+        SegConfig cfg = kConfig;
+        cfg.confidenceThreshold = h->confidenceThreshold;
+        if (!h->pipe.init(h->engine, cfg, err)) {
             setError("SegLoad: pipeline init: " + err);
             return false;
         }

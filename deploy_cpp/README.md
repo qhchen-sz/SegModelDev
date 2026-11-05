@@ -3,8 +3,9 @@
 把 `segformer_v2/runs_strat/<model>/best` 里的权重做成**独立 C++ 可执行程序 + TensorRT 引擎**，
 整图滑窗输入，输出语义图与叠加图。当前已接入两个模型：`v2_strat`（原 v2-fast）与 `sw_s4`（超参扫描选点）。
 
-**状态：两模型均已验证。** sw_s4 部署后 mIoU 0.7594（PyTorch 基线 0.7593），
+**历史基线（旧版直接 argmax）：两模型均已验证。** sw_s4 部署后 mIoU 0.7594（PyTorch 基线 0.7593），
 155 ms/图（PyTorch 864 ms）。S4 被选中的理由——负样本假阳降 82%——在部署后完整保留。
+当前默认使用 Softmax 最大置信度阈值 0.5 过滤背景；下文历史精度与速度不代表该阈值的重新评估结果。
 
 ---
 
@@ -141,7 +142,7 @@ deploy_cpp/
 ├── tools/crosscheck_eval.py # 用 sweep_eval.py 的参考实现跑 val、导出 label map
 ├── src/main.cpp             # CLI（--model/--engine）、评测模式、叠加图输出
 ├── src/trt_engine.hpp/.cpp  # 引擎加载 + 推理
-├── src/seg_pipeline.hpp/.cpp# 滑窗切块 + 归一化 + logits 累加 + argmax + segOverlay
+├── src/seg_pipeline.hpp/.cpp# 滑窗切块 + 归一化 + 平均 logits + Softmax 过滤 + segOverlay
 ├── segformer_dll/           # ← C ABI 导出层，供 C# 经 P/Invoke 调用（见 §10）
 │   ├── segformer_dll.hpp/.cpp
 │   ├── segformer_dll.vcxproj#   原生 VS 工程（与 CMakeLists 描述同一份源码，见 §8）
@@ -245,6 +246,8 @@ run.bat --model <name> --input <单张图> --dump-logits <out.bin>
 - `--eval`：读 `val_full.txt`（`图<TAB>GT.png`），打印 IoU 与平均耗时
 - `--dump-logits`：单 tile 原始 logits，用于与 `tools/parity_check.py` 做数值对齐
 - `--stride`（默认 448）/ `--batch`（默认 16）/ `--limit` / `--warmup`
+- `--confidence-threshold`（默认 0.5，范围 `[0,1]`）：Softmax 最大置信度低于阈值时判为背景，
+  等于阈值时保留；设为 0 可恢复只做 argmax 的标签结果（NaN 仍判为背景）
 
 ---
 
@@ -266,6 +269,7 @@ run.bat --model <name> --input <单张图> --dump-logits <out.bin>
 |---|---|
 | `void* SegCreate()` / `SegDestroy(void*)` | 不透明句柄，每个句柄一份引擎+CUDA 上下文 |
 | `bool SegLoad(const char* engine, void*)` | 加载 `.engine` |
+| `bool SegSetConfidenceThreshold(void*, float)` | 设置 Softmax 阈值 `[0,1]`，默认 0.5；可在加载前后调用 |
 | `int SegForward(uchar* bgr, int w, int h, int stride, void*)` | 整图滑窗推理；返回 0 成功 |
 | `const char* SegGetOverlay(int& w,int& h,int& step,int& ch, void*)` | 叠加图（BGR 3ch） |
 | `const char* SegGetMask(...)` | 纯语义图（单通道，像素值 0/1/2） |
@@ -310,8 +314,9 @@ var st = AI_Seg1.GetStat();          // 缺陷判定
 if (st.ng == 1) { /* st.px[1] 撕裂像素数 / st.px[2] 翻折像素数 / st.box* 外接框 */ }
 ```
 
-需要同时跑多个模型就用实例式的 `SegModel`（`new SegModel(engine)` / `Run` / `Dispose`）；
-`AI_Seg1` 只是它的静态薄壳，与 `AI_Gpu1` 的「一个槽一个模型」限制一致。
+需要同时跑多个模型或调整置信度阈值时，用实例式的 `SegModel`
+（`new SegModel(engine)` / `SetConfidenceThreshold(0.5f)` / `Run` / `Dispose`）；
+`AI_Seg1` 只是它的静态薄壳，与 `AI_Gpu1` 的「一个槽一个模型」限制一致，静态槽沿用默认阈值 0.5。
 
 可直接粘到软件脚本编辑器里的完整模板见 `EVDll_Segformer\SoftwareScriptSample.cs`
 （含纯语义图、缺陷统计与小面积过滤示例）。
@@ -374,7 +379,8 @@ EVDll_Segformer\build_csharp.bat   :: 再出 EVDll_Segformer.dll 与 SegTest.exe
 2. **mask 存成 PNG 时 GDI+ 会写成调色板 PNG**（IHDR color type=3），OpenCV 读它会展开成
    BGR（红→灰 76、蓝→灰 29），看着像「全是背景」。用 PIL 读索引值，或在 .NET 里直接读
    Bitmap 的像素值。**运行时不受影响**——Halcon 拿到的是 Bitmap 对象，不是 PNG。
-3. **分割没有置信度/NMS 阈值**，所以 `Run` 不带 `(conf, nms)` 参数。
+3. **Softmax 置信度阈值默认 0.5**，低于阈值判为背景；`Run` 仍不带 `(conf, nms)` 参数，
+   实例式 `SegModel` 可在 `Init` 后调用 `SetConfidenceThreshold` 调整，不做 NMS。
 4. 启动时会断言 `Marshal.SizeOf(SegStat) == SegStatSize()`（本机为 1840 字节），
    布局漂移会立刻报错而不是静默读错数据。
 
@@ -384,19 +390,20 @@ EVDll_Segformer\build_csharp.bat   :: 再出 EVDll_Segformer.dll 与 SegTest.exe
 
 | 环节 | Python 参考 | C++ 实现 |
 |---|---|---|
-| 切块 | `collect_tiles` `:28-42` | `seg_pipeline.cpp:collectTiles` |
-| 预处理 | `:45-47` | `fillNCHW`（BGR→RGB、/255、ImageNet mean/std、NCHW） |
-| 推理 | `:48-52` | TRT `execute_async_v3` + CUDA stream |
-| 上采样 | `:51` | `cv::resize(INTER_LINEAR)` |
-| 累加 | `:64-69` | `acc[c] += logits`，`argmax(acc)` |
-| 叠加 | `:71-76` | `main.cpp:overlay`，背景(60,60,60)/silie(0,0,255)/fanzhe(255,0,0)，alpha 0.5 |
+| 切块 | `collect_tiles` | `seg_pipeline.cpp:collectTiles` |
+| 预处理 | `batch_forward` | `fillNCHW`（BGR→RGB、/255、ImageNet mean/std、NCHW） |
+| 推理 | `batch_forward` | TRT `execute_async_v3` + CUDA stream |
+| 上采样 | `F.interpolate` | `cv::resize(INTER_LINEAR)` |
+| 累加与分类 | `sliding_predict_fast` / `logits_to_labels` | 累加 `logits` 与覆盖次数，平均后做 Softmax 置信度过滤 |
+| 叠加 | `overlay` | `main.cpp:overlay`，背景(60,60,60)/silie(0,0,255)/fanzhe(255,0,0)，alpha 0.5 |
 
 两个关键等价性：
 
 1. **上采样**：`F.interpolate(bilinear, align_corners=False)` 与 `cv::resize(INTER_LINEAR)`
    同为半像素中心约定，映射公式一致
-2. **argmax**：Python 是 `argmax(acc/cov)`，但 `cov` 对每个像素的三类相同，可约掉；
-   `cov==0` 的像素三类都是 0 → 取 0（背景），与 Python 一致
+2. **置信度过滤**：先算 `avg_logits=acc/cov`，标签取 `argmax(avg_logits)`，
+   置信度取 `max(Softmax(avg_logits))`；大于等于阈值时保留标签，否则取背景 0。
+   `cov==0` 的像素也取背景 0。
 
 实现细节取舍：
 - 累加**必须串行**（`stride 448 < tile 640`，相邻块 ROI 重叠），故只并行上采样、串行累加
@@ -415,16 +422,17 @@ EVDll_Segformer\build_csharp.bat   :: 再出 EVDll_Segformer.dll 与 SegTest.exe
        --img <同图> --best ..\segformer_v2\runs_strat\<name>\best --out torch.bin
    ```
    比 max\|Δ\|、相关系数、argmax 一致率
-3. **端到端对齐（89 张）**：`run.bat --model <name> --eval ..\segformer_v2\dataset_strat\val_full.txt`
-   —— mIoU 应达到 §3.1 表里的值
+3. **端到端对齐（89 张）**：`run.bat --model <name> --eval ..\segformer_v2\dataset_strat\val_full.txt --confidence-threshold 0`
+   —— 阈值 0 用于复现 §3.1 的旧版 argmax 基线；默认阈值 0.5 的指标需另行评估
 4. **交叉校验**（当 C++ 与基线对不齐时，判断是 fp16 差异还是管线 bug）：
    ```
-   run.bat --model <name> --eval <val_full> --out out_cpp --mask
+   run.bat --model <name> --eval <val_full> --out out_cpp --mask --confidence-threshold <threshold>
    F:\HymsonSoftWare\MiniForge\envs\yolov10\python.exe tools\crosscheck_eval.py ^
-       --best ..\segformer_v2\runs_strat\<name>\best --val-full <val_full> --out out_py
+       --best ..\segformer_v2\runs_strat\<name>\best --val-full <val_full> --out out_py ^
+       --confidence-threshold <threshold>
    ```
-   然后逐像素比 `out_cpp/mask/` 与 `out_py/`。差异应集中在类别边界、
-   且「非平局像素的 argmax 不一致率」为 0。
+   两端必须使用相同阈值，然后逐像素比 `out_cpp/mask/` 与 `out_py/`；
+   重点检查类别边界及置信度接近阈值的位置。
 
 ---
 
@@ -432,8 +440,8 @@ EVDll_Segformer\build_csharp.bat   :: 再出 EVDll_Segformer.dll 与 SegTest.exe
 
 - 未新建 HTTP 服务（按需求出独立可执行程序 + DLL）
 - **未改动 `D:\CaoJiaoJie\EVDll` 与 `D:\CaoJiaoJie\gpu_Dll_func` 任何文件**（只读参考）
-- 未改动 `segformer_v2/` 下任何脚本（`export_best_onnx.py` 只调用、不修改）
-- 未重训、未改 `sweep_report.md` / `sweep_eval.json`
+- 未重训，未改训练损失与反向传播；ONNX/引擎仍输出原始 logits，无需因后处理变化重新导出
+- 未改历史报告及已有 `sweep_eval.json` 结果文件
 - 未重新评估 222/C8/fl 三个现场批（超出「部署」范围）
 - 不做最小面积过滤（按要求只报原始统计）
 - 若还要更快：exe 路径 150.7 ms 中 GPU 占约 97 ms；DLL 路径多出的 ~55 ms 是

@@ -40,6 +40,7 @@ resume: true            # 有 ckpt 则断点续训
 
 # 推理（TTA + 640 + 密集 overlap）
 infer_stride: 320
+confidence_threshold: 0.5
 tta: true               # 推理时水平/垂直翻转
 
 # 复用 segformer 已生成的全图 GT

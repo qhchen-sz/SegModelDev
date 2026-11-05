@@ -14,6 +14,7 @@ from transformers import SegformerForSemanticSegmentation
 from pathlib import Path
 from dataset import SegV2Dataset
 from losses import V2Loss
+from postprocess import resolve_confidence_threshold, torch_logits_to_labels
 
 def set_seed(s):
     random.seed(s); np.random.seed(s); torch.manual_seed(s); torch.cuda.manual_seed_all(s)
@@ -36,7 +37,7 @@ def poly_lr(step, max_step, base, min_lr=0.0):
     return base * (1 - step / max_step) ** 0.9 + min_lr
 
 @torch.no_grad()
-def evaluate(model, loader, device, nc):
+def evaluate(model, loader, device, nc, confidence_threshold=0.5):
     model.eval()
     inter = np.zeros(nc, dtype=np.float64); union = np.zeros(nc, dtype=np.float64)
     for img, mask in loader:
@@ -44,7 +45,7 @@ def evaluate(model, loader, device, nc):
         mask = mask.to(device, non_blocking=True)
         out = model(pixel_values=img).logits
         out = F.interpolate(out, size=mask.shape[-2:], mode='bilinear', align_corners=False)
-        pred = out.argmax(1)
+        pred = torch_logits_to_labels(out, confidence_threshold)
         for c in range(nc):
             inter[c] += ((pred == c) & (mask == c)).sum().item()
             union[c] += ((pred == c) | (mask == c)).sum().item()
@@ -57,8 +58,10 @@ def main():
     ap.add_argument('--epochs', type=int, default=None)
     ap.add_argument('--batch_size', type=int, default=None)
     ap.add_argument('--no_resume', action='store_true')
+    ap.add_argument('--confidence-threshold', type=float, default=None)
     a = ap.parse_args()
     cfg = yaml.safe_load(open(Path(__file__).parent / 'config_strat.yaml', encoding='utf-8'))
+    threshold = resolve_confidence_threshold(cfg, a.confidence_threshold)
     if a.epochs is not None: cfg['epochs'] = a.epochs
     if a.batch_size is not None: cfg['batch_size'] = a.batch_size
     patience = cfg.get('patience', 100)
@@ -135,13 +138,13 @@ def main():
             if nb % 50 == 0:
                 guard_temp()
         ep_loss /= max(1, len(train_dl))
-        miou, ious = evaluate(model, val_dl, device, nc)
+        miou, ious = evaluate(model, val_dl, device, nc, threshold)
         with open(log_csv, 'a', newline='', encoding='utf-8') as f:
             csv.writer(f).writerow([epoch, f'{ep_loss:.4f}', f'{miou:.4f}',
                          f'{ious[0]:.4f}', f'{ious[1]:.4f}', f'{ious[2]:.4f}', f'{lr:.2e}'])
         print(f'[v2_strat] ep{epoch:3d} loss={ep_loss:.4f} mIoU={miou:.4f} '
               f'[bg={ious[0]:.3f} silie={ious[1]:.3f} fanzhe={ious[2]:.3f}] '
-              f'lr={lr:.2e} ({time.time()-t0:.0f}s)', flush=True)
+              f'lr={lr:.2e} ({time.time()-t0:.0f}s) confidence_threshold={threshold}', flush=True)
         if miou > best_miou:
             best_miou = miou; best_epoch = epoch
             model.save_pretrained(out / 'best')

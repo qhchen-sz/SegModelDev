@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from torch.amp import autocast
 from transformers import SegformerForSemanticSegmentation
 from pathlib import Path
+from postprocess import logits_to_labels, resolve_confidence_threshold
 
 MEAN=np.array([0.485,0.456,0.406],np.float32); STD=np.array([0.229,0.224,0.225],np.float32)
 TILE,STRIDE,BATCH=640,448,16
@@ -35,7 +36,7 @@ def collect(img):
     if xs[-1]+TILE<W: xs.append(max(0,W-TILE))
     return [(y0,x0,img[y0:y0+TILE,x0:x0+TILE]) for y0 in ys for x0 in xs],H,W
 
-def predict(m,img):
+def predict(m,img,confidence_threshold=0.5):
     tiles,H,W=collect(img); acc=None; cov=np.zeros((H,W),np.float32)
     for i in range(0,len(tiles),BATCH):
         b=tiles[i:i+BATCH]; ps=[]
@@ -51,26 +52,30 @@ def predict(m,img):
         if acc is None: acc=np.zeros((lg.shape[1],H,W),np.float32)
         for j,(y0,x0,p) in enumerate(b):
             ph,pw=p.shape[:2]; acc[:,y0:y0+ph,x0:x0+pw]+=lg[j][:,:ph,:pw]; cov[y0:y0+ph,x0:x0+pw]+=1
-    cov=np.maximum(cov,1e-6); return (acc/cov[None]).argmax(0).astype(np.uint8)
+    cov=np.maximum(cov,1e-6)
+    return logits_to_labels(acc/cov[None],confidence_threshold)
 
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument('--config', required=True)
     ap.add_argument('--run', required=True)
+    ap.add_argument('--confidence-threshold', type=float, default=None)
     a=ap.parse_args()
     cfg=yaml.safe_load(open(Path(__file__).parent/a.config,encoding='utf-8'))
+    threshold=resolve_confidence_threshold(cfg,a.confidence_threshold)
     out=Path(cfg['out_dir'])/a.run
     m=SegformerForSemanticSegmentation.from_pretrained(out/'best').to('cuda').eval()
-    res={'run':a.run,'config':a.config,'bg_keep':cfg['bg_keep_ratio'],'alpha_bg':cfg['focal_alpha'][0]}
+    res={'run':a.run,'config':a.config,'bg_keep':cfg['bg_keep_ratio'],
+         'alpha_bg':cfg['focal_alpha'][0],'confidence_threshold':threshold}
 
     # (a) val_strat
     lines=load_val_full(str(cfg['val_full_txt']))
     inter=np.zeros(3,np.float64); union=np.zeros(3,np.float64)
     neg_fp=[]; n_pos=0; psi=psu=pfi=pfu=0; times=[]
-    _=predict(m,cv2.imread(lines[0][0])); torch.cuda.synchronize()
+    _=predict(m,cv2.imread(lines[0][0]),threshold); torch.cuda.synchronize()
     for ip,mp in lines:
         img=cv2.imread(ip); gt=cv2.imread(mp,cv2.IMREAD_UNCHANGED)
-        torch.cuda.synchronize(); t0=time.time(); pred=predict(m,img); torch.cuda.synchronize(); times.append(time.time()-t0)
+        torch.cuda.synchronize(); t0=time.time(); pred=predict(m,img,threshold); torch.cuda.synchronize(); times.append(time.time()-t0)
         for c in range(3):
             inter[c]+=((pred==c)&(gt==c)).sum(); union[c]+=((pred==c)|(gt==c)).sum()
         if (gt>0).sum()==0:
@@ -94,7 +99,7 @@ def main():
         imgs=sorted(glob.glob(str(Path(d)/'*.jpg')))
         per={}; flag=0; tot=0
         for f in imgs:
-            pred=predict(m,cv2.imread(f)); dpx=int((pred>0).sum())
+            pred=predict(m,cv2.imread(f),threshold); dpx=int((pred>0).sum())
             per[Path(f).name]=dpx
             if dpx>0: flag+=1
             tot+=dpx
@@ -103,7 +108,7 @@ def main():
 
     (out/'sweep_eval.json').write_text(json.dumps(res,ensure_ascii=False,indent=1),encoding='utf-8')
     v=res['val']
-    print(f'[{a.run}] val mIoU={v["mIoU"]} silie={v["silie"]} fanzhe={v["fanzhe"]} | neg avg_fp={v["neg_avg_fp"]} max={v["neg_max_fp"]} gt100={v["neg_gt100"]}/{v["n_neg"]}',flush=True)
+    print(f'[{a.run}] val mIoU={v["mIoU"]} silie={v["silie"]} fanzhe={v["fanzhe"]} | neg avg_fp={v["neg_avg_fp"]} max={v["neg_max_fp"]} gt100={v["neg_gt100"]}/{v["n_neg"]} | confidence_threshold={threshold}',flush=True)
     print(f'-> {out/"sweep_eval.json"}',flush=True)
 
 if __name__=='__main__':

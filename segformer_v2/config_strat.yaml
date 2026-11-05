@@ -40,4 +40,5 @@ eval_every: 1
 resume: true
 
 infer_stride: 320
+confidence_threshold: 0.5
 tta: true

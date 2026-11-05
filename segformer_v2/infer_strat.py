@@ -9,6 +9,7 @@ import cv2, torch
 import torch.nn.functional as F
 from transformers import SegformerForSemanticSegmentation
 from pathlib import Path
+from postprocess import logits_to_labels, resolve_confidence_threshold
 
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32) * 255
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32) * 255
@@ -28,7 +29,8 @@ def _forward_tile(model, patch, device):
         lg = model(pixel_values=t).logits
     return lg[0].cpu().numpy()
 
-def sliding_predict(model, img_bgr, tile, stride, device, tta):
+def sliding_predict(model, img_bgr, tile, stride, device, tta,
+                    confidence_threshold=0.5):
     H, W = img_bgr.shape[:2]
     acc = None; cov = np.zeros((H, W), dtype=np.float32)
     ys = list(range(0, max(1, H - tile + 1), stride))
@@ -51,7 +53,7 @@ def sliding_predict(model, img_bgr, tile, stride, device, tta):
             acc[:, y0:y0+ph, x0:x0+pw] += lg
             cov[y0:y0+ph, x0:x0+pw] += 1.0
     cov = np.maximum(cov, 1e-6)
-    return (acc / cov[None]).argmax(0).astype(np.uint8)
+    return logits_to_labels(acc / cov[None], confidence_threshold)
 
 def overlay(img, pred, alpha=0.5):
     ov = img.copy()
@@ -71,8 +73,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--run', default='v2_strat')
     ap.add_argument('--no_tta', action='store_true')
+    ap.add_argument('--confidence-threshold', type=float, default=None)
     a = ap.parse_args()
     cfg = yaml.safe_load(open(Path(__file__).parent / 'config_strat.yaml', encoding='utf-8'))
+    threshold = resolve_confidence_threshold(cfg, a.confidence_threshold)
     device = 'cuda'
     out = Path(cfg['out_dir']) / a.run
     ov_dir = out / 'overlays'; ov_dir.mkdir(parents=True, exist_ok=True)
@@ -81,13 +85,15 @@ def main():
     lines = load_val_full(str(cfg['val_full_txt']))
     inter = np.zeros(3, dtype=np.float64); union = np.zeros(3, dtype=np.float64)
     times = []
-    _ = sliding_predict(model, cv2.imread(lines[0][0]), cfg['tile_size'], cfg['infer_stride'], device, tta)
+    _ = sliding_predict(model, cv2.imread(lines[0][0]), cfg['tile_size'], cfg['infer_stride'],
+                        device, tta, threshold)
     torch.cuda.synchronize()
-    print(f'infer {len(lines)} val images (TTA={tta}) ...')
+    print(f'infer {len(lines)} val images (TTA={tta}, confidence_threshold={threshold}) ...')
     for i, (ip, mp) in enumerate(lines):
         img = cv2.imread(ip); gt = cv2.imread(mp, cv2.IMREAD_UNCHANGED)
         torch.cuda.synchronize(); t0 = time.time()
-        pred = sliding_predict(model, img, cfg['tile_size'], cfg['infer_stride'], device, tta)
+        pred = sliding_predict(model, img, cfg['tile_size'], cfg['infer_stride'],
+                               device, tta, threshold)
         torch.cuda.synchronize(); times.append(time.time() - t0)
         a_i, b_i = iou(pred, gt); inter += a_i; union += b_i
         cv2.imwrite(str(ov_dir / (Path(ip).stem + '.png')), overlay(img, pred))
@@ -99,7 +105,8 @@ def main():
     print(f'avg inference = {avg_ms:.1f} ms/image (n={len(times)})')
     with open(out / 'eval_result.txt', 'w', encoding='utf-8') as f:
         f.write(f'background_IoU={ious[0]:.4f}\nsilie_IoU={ious[1]:.4f}\nfanzhe_IoU={ious[2]:.4f}\n'
-                f'mIoU={ious.mean():.4f}\navg_inference_ms={avg_ms:.1f}\nnum_images={len(times)}\nuse_tta={tta}\n')
+                f'mIoU={ious.mean():.4f}\navg_inference_ms={avg_ms:.1f}\nnum_images={len(times)}\n'
+                f'use_tta={tta}\nconfidence_threshold={threshold}\n')
 
 if __name__ == '__main__':
     main()

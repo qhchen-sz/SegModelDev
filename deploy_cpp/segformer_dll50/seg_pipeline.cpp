@@ -14,6 +14,7 @@
 #include <atomic>
 #include <chrono>
 #include <climits>
+#include <cmath>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -322,6 +323,7 @@ void SegPipeline::release() {
     releaseWorkers();
     std::vector<float>().swap(upAll_);   // 真正归还上采样中转缓冲
     std::vector<cv::Mat>().swap(acc_);   // 归还累加缓冲（cv::Mat 析构释放像素内存）
+    cov_.release();
     // 恢复 OpenCV 全局线程数（init 时压到 1，见 startPool 后那段）
     if (cvThreadsSaved_) {
         cv::setNumThreads(cvThreadsOld_);
@@ -411,11 +413,21 @@ void SegPipeline::stopPool() {
     }
 }
 
+bool SegPipeline::setConfidenceThreshold(float threshold, std::string& err) {
+    if (!std::isfinite(threshold) || threshold < 0.0f || threshold > 1.0f) {
+        err = "confidence threshold must be finite and in [0,1]";
+        return false;
+    }
+    cfg_.confidenceThreshold = threshold;
+    return true;
+}
+
 bool SegPipeline::init(TrtEngine& eng, const SegConfig& cfg, std::string& err) {
     // 旧资源必须经旧的 eng_ 释放，因此在重新赋值之前调用
     release();
     eng_ = &eng;
     cfg_ = cfg;
+    if (!setConfidenceThreshold(cfg.confidenceThreshold, err)) return false;
 
     tile_ = eng.inputHeight();
     if (eng.inputWidth() != tile_) {
@@ -520,7 +532,7 @@ bool SegPipeline::init(TrtEngine& eng, const SegConfig& cfg, std::string& err) {
             prof_ = profEnv && *profEnv && std::strcmp(profEnv, "0") != 0;
 
             // worker 内的 cv::resize/copyMakeBorder 不需要也不应该再开 OpenCV 线程池：
-            // 全局压到 1，overlay/argmax 复用常驻 worker 线程（runRows）。只在这里设置一次，
+            // 全局压到 1，overlay/Softmax 后处理复用常驻 worker 线程（runRows）。只在这里设置一次，
             // release() 时恢复，避免每帧销毁/重建 OpenCV 线程池。
             if (!cvThreadsSaved_) {
                 cvThreadsOld_ = cv::getNumThreads();
@@ -903,10 +915,12 @@ bool SegPipeline::inferImage(const cv::Mat& bgrIn, cv::Mat& labels, std::string&
             acc_[c].create(H, W, CV_32F);
             acc_[c].setTo(0);
         }
+        cov_.create(H, W, CV_32F);
+        cov_.setTo(0);
         if (prof) lastTiming_.clearNs = nsBetween(t0, ProfClock::now());
         if (segtrace::enabled()) {
             sc.setNote("bytes=" + std::to_string(static_cast<long long>(H) * W *
-                                                 cfg_.numClasses * 4));
+                                                 (cfg_.numClasses + 1) * 4));
         }
     }
 
@@ -1018,19 +1032,20 @@ bool SegPipeline::inferImage(const cv::Mat& bgrIn, cv::Mat& labels, std::string&
         segtrace::Scope sc("dll.post.acc");
         for (std::size_t j = 0; j < tiles.size(); ++j) {
             const Tile& t = tiles[j];
+            const cv::Rect valid(t.x0, t.y0, t.pw, t.ph);
             const float* up = upAll_.data() + j * upStride;
             for (int c = 0; c < cfg_.numClasses; ++c) {
                 cv::Mat upm(tile_, tile_, CV_32F,
                             const_cast<float*>(up + static_cast<std::size_t>(c) * tileHW));
-                cv::Mat roi = acc_[c](cv::Rect(t.x0, t.y0, t.pw, t.ph));
+                cv::Mat roi = acc_[c](valid);
                 roi += upm(cv::Rect(0, 0, t.pw, t.ph));
             }
+            cov_(valid) += 1.0f;
         }
     }
     const auto tAcc1 = needT ? ProfClock::now() : ProfClock::time_point{};
 
-    // argmax：Python 是 argmax(acc/cov)，但 cov 对每个像素的三类相同，可约掉。
-    // cov 为 0 的像素三类都是 0 -> argmax 取 0（背景），与 Python 一致。
+    // Softmax 必须在平均 logits 上计算，覆盖次数不能在概率计算前约掉。
     {
         segtrace::Scope sc("dll.post.argmax");
         labels.create(H, W, CV_8UC1);
@@ -1039,19 +1054,27 @@ bool SegPipeline::inferImage(const cv::Mat& bgrIn, cv::Mat& labels, std::string&
                     const float* a0 = acc_[0].ptr<float>(y);
                     const float* a1 = acc_[1].ptr<float>(y);
                     const float* a2 = acc_.size() > 2u ? acc_[2].ptr<float>(y) : nullptr;
+                    const float* cov = cov_.ptr<float>(y);
                     uchar* out = labels.ptr<uchar>(y);
                     for (int x = 0; x < W; ++x) {
+                        const float invCov = 1.0f / std::max(cov[x], 1e-6f);
+                        const float v0 = a0[x] * invCov;
+                        const float v1 = a1[x] * invCov;
+                        const float v2 = a2 ? a2[x] * invCov : 0.0f;
                         int best = 0;
-                        float bv = a0[x];
-                        if (a1[x] > bv) {
+                        float bv = v0;
+                        if (v1 > bv) {
                             best = 1;
-                            bv = a1[x];
+                            bv = v1;
                         }
-                        if (a2 && a2[x] > bv) {
+                        if (a2 && v2 > bv) {
                             best = 2;
-                            bv = a2[x];
+                            bv = v2;
                         }
-                        out[x] = static_cast<uchar>(best);
+                        float denom = std::exp(v0 - bv) + std::exp(v1 - bv);
+                        if (a2) denom += std::exp(v2 - bv);
+                        const float confidence = 1.0f / denom;
+                        out[x] = static_cast<uchar>(confidence >= cfg_.confidenceThreshold ? best : 0);
                     }
                 }
             }, err)) {

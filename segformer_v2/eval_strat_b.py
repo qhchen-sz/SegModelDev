@@ -14,6 +14,7 @@ import torch.nn.functional as F
 from torch.amp import autocast
 from transformers import SegformerForSemanticSegmentation
 from pathlib import Path
+from postprocess import logits_to_labels, resolve_confidence_threshold
 
 MEAN = np.array([0.485,0.456,0.406],dtype=np.float32); STD = np.array([0.229,0.224,0.225],dtype=np.float32)
 TILE, STRIDE, BATCH = 640, 448, 16
@@ -46,33 +47,36 @@ def fwd(model,ps,device):
         with autocast('cuda',dtype=torch.float16): lg=model(pixel_values=t).logits
     return F.interpolate(lg.float(),size=(TILE,TILE),mode='bilinear',align_corners=False).cpu().numpy()
 
-def predict(model,img,device):
+def predict(model,img,device,confidence_threshold=0.5):
     tiles,H,W=collect(img,TILE,STRIDE); acc=None; cov=np.zeros((H,W),np.float32)
     for i in range(0,len(tiles),BATCH):
         b=tiles[i:i+BATCH]; lg=fwd(model,[x[2] for x in b],device)
         if acc is None: acc=np.zeros((lg.shape[1],H,W),np.float32)
         for j,(y0,x0,_,ph,pw) in enumerate(b):
             acc[:,y0:y0+ph,x0:x0+pw]+=lg[j][:,:ph,:pw]; cov[y0:y0+ph,x0:x0+pw]+=1
-    cov=np.maximum(cov,1e-6); return (acc/cov[None]).argmax(0).astype(np.uint8)
+    cov=np.maximum(cov,1e-6)
+    return logits_to_labels(acc/cov[None],confidence_threshold)
 
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument('--config', default='config_strat.yaml')
     ap.add_argument('--run', default='v2_strat')
+    ap.add_argument('--confidence-threshold', type=float, default=None)
     a=ap.parse_args()
     cfg=yaml.safe_load(open(Path(__file__).parent/a.config,encoding='utf-8'))
+    threshold=resolve_confidence_threshold(cfg,a.confidence_threshold)
     device='cuda'
     out=Path(cfg['out_dir'])/a.run
     model=SegformerForSemanticSegmentation.from_pretrained(out/'best').to(device).eval()
     lines=load_val_full(str(cfg['val_full_txt']))
     inter=np.zeros(3,np.float64); union=np.zeros(3,np.float64)
     neg_fp=[]; times=[]; n_pos=0; pos_silie_i=pos_silie_u=pos_fan_i=pos_fan_u=0
-    _=predict(model,cv2.imread(lines[0][0]),device); torch.cuda.synchronize()
-    print(f'[{a.run}] fast eval {len(lines)} imgs ...',flush=True)
+    _=predict(model,cv2.imread(lines[0][0]),device,threshold); torch.cuda.synchronize()
+    print(f'[{a.run}] fast eval {len(lines)} imgs, confidence_threshold={threshold} ...',flush=True)
     for i,(ip,mp) in enumerate(lines):
         img=cv2.imread(ip); gt=cv2.imread(mp,cv2.IMREAD_UNCHANGED)
         torch.cuda.synchronize(); t0=time.time()
-        pred=predict(model,img,device); torch.cuda.synchronize(); times.append(time.time()-t0)
+        pred=predict(model,img,device,threshold); torch.cuda.synchronize(); times.append(time.time()-t0)
         for c in range(3):
             inter[c]+=((pred==c)&(gt==c)).sum(); union[c]+=((pred==c)|(gt==c)).sum()
         neg = (gt>0).sum()==0
@@ -88,7 +92,7 @@ def main():
     n_neg=len(neg_fp)
     fp_img_100=int((neg_fp>100).sum()); fp_img_1000=int((neg_fp>1000).sum())
     L=[]
-    L.append(f'=== {a.run} fast 全图评估 (bs16 fp16 stride448 noTTA, {len(lines)} 图) ===')
+    L.append(f'=== {a.run} fast 全图评估 (bs16 fp16 stride448 noTTA, {len(lines)} 图, confidence_threshold={threshold}) ===')
     L.append(f'整体: mIoU={ious.mean():.4f}  bg={ious[0]:.4f} silie={ious[1]:.4f} fanzhe={ious[2]:.4f}')
     L.append(f'-- 仅正样本图({n_pos}张)缺陷IoU: silie={pos_silie_i/(pos_silie_u+1e-9):.4f} fanzhe={pos_fan_i/(pos_fan_u+1e-9):.4f}')
     L.append(f'-- GT负样本(全0 mask, {n_neg}张)假阳统计:')

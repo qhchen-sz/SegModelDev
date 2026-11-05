@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from torch.amp import autocast
 from transformers import SegformerForSemanticSegmentation
 from pathlib import Path
+from postprocess import logits_to_labels, resolve_confidence_threshold
 
 S4_BEST = r"D:/qhchen/NewModel/ADevFolder/segformer_v2/runs_strat/sw_s4/best"
 YOLO_BEST = r"D:/qhchen/NewModel/ADevFolder/runs_strat/train_strat/weights/best.pt"
@@ -34,7 +35,7 @@ def collect(img):
             r.append((y0,x0,p,ph,pw))
     return r,H,W
 
-def s4_predict(m,img):
+def s4_predict(m,img,confidence_threshold=0.5):
     tiles,H,W=collect(img); acc=None; cov=np.zeros((H,W),np.float32)
     for i in range(0,len(tiles),BATCH):
         b=tiles[i:i+BATCH]
@@ -46,7 +47,8 @@ def s4_predict(m,img):
         if acc is None: acc=np.zeros((lg.shape[1],H,W),np.float32)
         for j,(y0,x0,_,ph,pw) in enumerate(b):
             acc[:,y0:y0+ph,x0:x0+pw]+=lg[j][:,:ph,:pw]; cov[y0:y0+ph,x0:x0+pw]+=1
-    cov=np.maximum(cov,1e-6); return (acc/cov[None]).argmax(0).astype(np.uint8)
+    cov=np.maximum(cov,1e-6)
+    return logits_to_labels(acc/cov[None],confidence_threshold)
 
 def yolo_predict(ym,img):
     H,W=img.shape[:2]; res=ym(img,imgsz=1200,conf=0.25,iou=0.5,verbose=False)[0]
@@ -73,24 +75,30 @@ def iou2(a,b,nc=3):
     return it,un
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--batch',required=True); a=ap.parse_args()
+    import yaml
+    ap=argparse.ArgumentParser()
+    ap.add_argument('--batch',required=True)
+    ap.add_argument('--confidence-threshold',type=float,default=None)
+    a=ap.parse_args()
+    cfg=yaml.safe_load(open(Path(__file__).parent/'config_sw_s4.yaml',encoding='utf-8'))
+    threshold=resolve_confidence_threshold(cfg,a.confidence_threshold)
     IMG=Path(a.batch); OUT=IMG/'_results'; OUT.mkdir(exist_ok=True)
     OV=OUT/'overlays_s4'; OV.mkdir(exist_ok=True)
     OVY=OUT/'overlays_yolo'; OVY.mkdir(exist_ok=True)
     imgs=sorted(glob.glob(str(IMG/'*.jpg')))
     H0,W0=cv2.imread(imgs[0]).shape[:2]
-    print(f'[{IMG.name}] {len(imgs)} 张, {W0}x{H0}')
+    print(f'[{IMG.name}] {len(imgs)} 张, {W0}x{H0}, confidence_threshold={threshold}')
     s4=SegformerForSemanticSegmentation.from_pretrained(S4_BEST).to(dev).eval()
     from ultralytics import YOLO
     ym=YOLO(YOLO_BEST)
-    _=s4_predict(s4,cv2.imread(imgs[0])); _=yolo_predict(ym,cv2.imread(imgs[0]))
+    _=s4_predict(s4,cv2.imread(imgs[0]),threshold); _=yolo_predict(ym,cv2.imread(imgs[0]))
     if dev=='cuda': torch.cuda.synchronize()
     rt=[]; rs=[]; I=np.zeros(3,np.int64); U=np.zeros(3,np.int64)
     s4f=yf=0
     for i,ip in enumerate(imgs):
         img=cv2.imread(ip)
         if dev=='cuda': torch.cuda.synchronize()
-        t0=time.time(); p4=s4_predict(s4,img)
+        t0=time.time(); p4=s4_predict(s4,img,threshold)
         if dev=='cuda': torch.cuda.synchronize()
         t4=(time.time()-t0)*1000
         if dev=='cuda': torch.cuda.synchronize()
@@ -116,7 +124,7 @@ def main():
     L=[f'# S4 模型测试报告（{IMG.name} | {n} 张全图，无 GT）\n',
        '## 说明\n',
        '- 模型: **S4** (bg_keep=0.12, focal_alpha(bg)=0.80) —— 超参扫描胜出配置，相较 v2 基线假阳 -82%、IoU 不降。',
-       '- 对比: YOLOv8n-seg。口径: S4 bs16 fp16 stride448 noTTA; yolo imgsz1200 conf0.25 iou0.5。',
+       f'- 对比: YOLOv8n-seg。口径: S4 bs16 fp16 stride448 noTTA Softmax置信度过滤(conf{threshold}); yolo imgsz1200 conf0.25 iou0.5。',
        f'- 本批无标注, 精度指标 N/A; 叠加图 `overlays_s4/`、`overlays_yolo/`（silie红/fanzhe蓝）。\n',
        f'## 推理速度（RTX 3090，全图 {W0}×{H0}）\n',
        '| 模型 | 平均 ms/图 | 最小 | 最大 |', '|---|---|---|---|',

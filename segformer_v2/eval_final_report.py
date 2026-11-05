@@ -6,12 +6,13 @@ GT: segformer_v2/dataset_strat/val_full.txt (88 图全图 mask)。
 """
 import os
 os.environ.setdefault('HF_ENDPOINT','https://hf-mirror.com')
-import time, yaml
+import argparse, time, yaml
 import numpy as np, cv2, torch
 import torch.nn.functional as F
 from torch.amp import autocast
 from transformers import SegformerForSemanticSegmentation
 from pathlib import Path
+from postprocess import logits_to_labels, resolve_confidence_threshold
 
 ROOT = Path(__file__).resolve().parent.parent
 VAL_FULL = ROOT / 'segformer_v2' / 'dataset_strat' / 'val_full.txt'
@@ -47,7 +48,7 @@ def collect(img):
             r.append((y0,x0,p,ph,pw))
     return r,H,W
 
-def seg_predict(m,img):
+def seg_predict(m,img,confidence_threshold=0.5):
     tiles,H,W=collect(img); acc=None; cov=np.zeros((H,W),np.float32)
     for i in range(0,len(tiles),BATCH):
         b=tiles[i:i+BATCH]
@@ -59,7 +60,8 @@ def seg_predict(m,img):
         if acc is None: acc=np.zeros((lg.shape[1],H,W),np.float32)
         for j,(y0,x0,_,ph,pw) in enumerate(b):
             acc[:,y0:y0+ph,x0:x0+pw]+=lg[j][:,:ph,:pw]; cov[y0:y0+ph,x0:x0+pw]+=1
-    cov=np.maximum(cov,1e-6); return (acc/cov[None]).argmax(0).astype(np.uint8)
+    cov=np.maximum(cov,1e-6)
+    return logits_to_labels(acc/cov[None],confidence_threshold)
 
 def yolo_predict(ym,img):
     H,W=img.shape[:2]; res=ym(img,imgsz=1200,conf=0.25,iou=0.5,verbose=False)[0]
@@ -88,13 +90,18 @@ def evaluate(pred_fn, val, warmup_img):
     return iou,rec,prec,float(np.mean(ts))*1000
 
 def main():
-    val=load_val(); print(f'val_strat: {len(val)} 图')
+    ap=argparse.ArgumentParser()
+    ap.add_argument('--confidence-threshold',type=float,default=None)
+    a=ap.parse_args()
+    cfg=yaml.safe_load(open(ROOT/'segformer_v2'/'config_strat.yaml',encoding='utf-8'))
+    threshold=resolve_confidence_threshold(cfg,a.confidence_threshold)
+    val=load_val(); print(f'val_strat: {len(val)} 图, confidence_threshold={threshold}')
     results={}
     # S4 + v2-fast (segformer)
     for name,path in [('S4',S4_BEST),('v2-fast',V2_BEST)]:
         print(f'评估 {name} ...',flush=True)
         m=SegformerForSemanticSegmentation.from_pretrained(str(path)).to(dev).eval()
-        results[name]=evaluate(lambda im:seg_predict(m,im), val, cv2.imread(val[0][0]))
+        results[name]=evaluate(lambda im:seg_predict(m,im,threshold), val, cv2.imread(val[0][0]))
         del m; torch.cuda.empty_cache()
     # yolo
     print('评估 YOLO ...',flush=True)
@@ -105,7 +112,7 @@ def main():
     order=['S4','v2-fast','YOLO']
     L=['# 三模型在 val_strat 验证集上的指标对比\n',
        f'- 验证集: `val_strat.txt`（{len(val)} 张全图，含 GT）',
-       '- 口径: S4 & v2-fast = bs16 fp16 stride448 noTTA 全图滑窗; YOLO = imgsz1200 conf0.25 iou0.5',
+       f'- 口径: S4 & v2-fast = bs16 fp16 stride448 noTTA 全图滑窗 + Softmax 置信度过滤(conf{threshold}); YOLO = imgsz1200 conf0.25 iou0.5',
        '- 指标为像素级 per-class：IoU = TP/(TP+FP+FN)，Recall = TP/(TP+FN)，Precision = TP/(TP+FP)\n',
        '## per-class IoU\n',
        '| 类别 | S4 | v2-fast | YOLO |', '|---|---|---|---|']

@@ -54,6 +54,7 @@ const char* kUsage =
     "  --limit  <N>          只处理前 N 张（调试用）\n"
     "  --stride <N>          滑窗步长，默认 448（须与 infer_fast_strat.py 一致）\n"
     "  --batch  <N>          单次前向块数，默认 16\n"
+    "  --confidence-threshold <float>  Softmax 置信度阈值 [0,1]，默认 0.5\n"
     "  --warmup <N>          预热次数，不计入耗时，默认 1\n";
 
 // exe 所在目录；失败返回空串。用来在不依赖当前工作目录的前提下定位 models\。
@@ -179,6 +180,9 @@ int main(int argc, char** argv) {
         else if (a == "--limit") limit = std::stoi(next("--limit"));
         else if (a == "--stride") cfg.stride = std::stoi(next("--stride"));
         else if (a == "--batch") cfg.batch = std::stoi(next("--batch"));
+        else if (a == "--confidence-threshold") {
+            cfg.confidenceThreshold = std::stof(next("--confidence-threshold"));
+        }
         else if (a == "--warmup") warmup = std::stoi(next("--warmup"));
         else if (a == "-h" || a == "--help") { std::printf("%s", kUsage); return 0; }
         else { std::fprintf(stderr, "[ERROR] unknown arg: %s\n\n%s", a.c_str(), kUsage); return 2; }
@@ -203,8 +207,8 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "[ERROR] pipeline init: %s\n", err.c_str());
         return 1;
     }
-    std::printf("  pipeline: tile=%d stride=%d batch=%d classes=%d\n\n", pipe.tileSize(),
-                cfg.stride, cfg.batch, cfg.numClasses);
+    std::printf("  pipeline: tile=%d stride=%d batch=%d classes=%d confidence_threshold=%.4f\n\n",
+                pipe.tileSize(), cfg.stride, cfg.batch, cfg.numClasses, cfg.confidenceThreshold);
 
     // ---- dump-logits: 单 tile 原始输出，用于和 PyTorch 做数值对齐 ----
     if (!dumpLogits.empty()) {
@@ -315,8 +319,8 @@ int main(int argc, char** argv) {
         const double miou = (iou[0] + iou[1] + iou[2]) / 3.0;
         const double avgMs = n > 0 ? totalMs / n : 0.0;
 
-        std::printf("\n=== SegFormer (TensorRT) tile=%d stride=%d batch=%d ===\n",
-                    pipe.tileSize(), cfg.stride, cfg.batch);
+        std::printf("\n=== SegFormer (TensorRT) tile=%d stride=%d batch=%d confidence_threshold=%.4f ===\n",
+                    pipe.tileSize(), cfg.stride, cfg.batch, cfg.confidenceThreshold);
         std::printf("engine: %s\n", enginePath.c_str());
         std::printf("background IoU=%.4f\nsilie IoU=%.4f\nfanzhe IoU=%.4f\nmIoU=%.4f\n", iou[0],
                     iou[1], iou[2], miou);
