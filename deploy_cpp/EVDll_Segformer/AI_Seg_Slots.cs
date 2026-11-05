@@ -112,6 +112,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -231,6 +257,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -354,6 +406,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -473,6 +551,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -596,6 +700,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -715,6 +845,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -838,6 +994,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -957,6 +1139,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -1080,6 +1288,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -1199,6 +1433,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -1322,6 +1582,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -1441,6 +1727,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -1564,6 +1876,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -1683,6 +2021,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -1806,6 +2170,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -1925,6 +2315,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -2048,6 +2464,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -2167,6 +2609,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -2290,6 +2758,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -2409,6 +2903,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -2532,6 +3052,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -2651,6 +3197,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -2774,6 +3346,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -2893,6 +3491,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -3016,6 +3640,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -3135,6 +3785,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -3258,6 +3934,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -3377,6 +4079,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -3500,6 +4228,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -3619,6 +4373,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -3742,6 +4522,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -3861,6 +4667,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -3984,6 +4816,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -4103,6 +4961,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -4226,6 +5110,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -4345,6 +5255,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -4468,6 +5404,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -4587,6 +5549,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -4710,6 +5698,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -4829,6 +5843,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -4952,6 +5992,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -5071,6 +6137,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -5194,6 +6286,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -5313,6 +6431,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()
@@ -5436,6 +6580,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -5557,6 +6727,32 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
+        }
+
         public static void Close()
         {
             if (_model != null)
@@ -5676,6 +6872,32 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
+        public static bool SetConfidenceThreshold(float threshold)
+        {
+            string dummy = null;
+            return SetConfidenceThreshold(threshold, ref dummy);
+        }
+
+        public static bool SetConfidenceThreshold(float threshold, ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return false;
+            }
+            try
+            {
+                _model.SetConfidenceThreshold(threshold);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "设置置信度阈值报错：" + e;
+                return false;
+            }
         }
 
         public static void Close()

@@ -293,6 +293,8 @@ nbox / boxCls[]{64} boxX/Y/W/H[] boxPx[]
 ```csharp
 public static void   Init(string AIPath);
 public static void   Init(string AIPath, ref string ErroMessage);
+public static bool   SetConfidenceThreshold(float threshold);
+public static bool   SetConfidenceThreshold(float threshold, ref string ErroMessage);
 public static Bitmap Run(Bitmap bitmap);                     // 叠加图
 public static Bitmap Run(Bitmap bitmap, ref string ErroMessage);
 public static Bitmap GetMask();                              // 纯 0/1/2 mask
@@ -306,6 +308,7 @@ public static void   Close();
 using EVDll_Segformer;
 ...
 AI_Seg1.Init(@"...\segformer_sw_s4_b1_fp16_640.engine", ref erro);
+if (!AI_Seg1.SetConfidenceThreshold(0.5f, ref erro)) { LogError(erro); return false; }
 var image = AI_Seg1.Run(GetBitMap("采集图像.图像"), ref erro);
 if (erro != "") { LogError(erro); return false; }
 SetBitMap(image, "采集图像.图像");
@@ -314,9 +317,10 @@ var st = AI_Seg1.GetStat();          // 缺陷判定
 if (st.ng == 1) { /* st.px[1] 撕裂像素数 / st.px[2] 翻折像素数 / st.box* 外接框 */ }
 ```
 
-需要同时跑多个模型或调整置信度阈值时，用实例式的 `SegModel`
+48 个静态槽都提供 `SetConfidenceThreshold`，在 `Init` 成功后调用一次即可持续生效。
+需要同时跑多个模型或更精细控制加载/释放生命周期时，也可以用实例式的 `SegModel`
 （`new SegModel(engine)` / `SetConfidenceThreshold(0.5f)` / `Run` / `Dispose`）；
-`AI_Seg1` 只是它的静态薄壳，与 `AI_Gpu1` 的「一个槽一个模型」限制一致，静态槽沿用默认阈值 0.5。
+`AI_Seg1` 只是它的静态薄壳，与 `AI_Gpu1` 的「一个槽一个模型」限制一致。
 
 可直接粘到软件脚本编辑器里的完整模板见 `EVDll_Segformer\SoftwareScriptSample.cs`
 （含纯语义图、缺陷统计与小面积过滤示例）。

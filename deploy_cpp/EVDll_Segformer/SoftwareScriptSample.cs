@@ -24,6 +24,10 @@ public class MyScript : ScriptMethods
     private const string EnginePath =
         @"D:\CaoJiaoJie\hmxstudio\00Exe\models\segformer_sw_s4_b1_fp16_640.engine";
 
+    // Softmax 置信度阈值，合法范围 [0,1]；等于阈值保留，低于阈值判背景。
+    private const float ConfidenceThreshold = 0.5f;
+    private static bool _thresholdSet;
+
     // 脚本执行该方法
     public bool Process()
     {//@
@@ -37,6 +41,17 @@ public class MyScript : ScriptMethods
             {
                 LogError(GetLogPre() + erro);
                 return false;
+            }
+
+            // 阈值持续生效到 Close；若脚本里显式 Close 后重新 Init，需要同时重置 _thresholdSet。
+            if (!_thresholdSet)
+            {
+                if (!AI_Seg1.SetConfidenceThreshold(ConfidenceThreshold, ref erro))
+                {
+                    LogError(GetLogPre() + erro);
+                    return false;
+                }
+                _thresholdSet = true;
             }
 
             var src = GetBitMap("采集图像.图像");
