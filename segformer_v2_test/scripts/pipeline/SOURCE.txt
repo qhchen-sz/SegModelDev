@@ -1,0 +1,6 @@
+Source root : D:/qhchen/NewModel/newsiliec9
+Git commit  : 2aea5ca0a612ce908240fcc0a5f378e7f4e07063
+Copied on  : 2026-10-22
+Files       : train_strat_b.py, dataset.py, losses.py, convert_strat_b.py,
+              export_best_onnx.py, sweep_eval.py, config_strat.yaml
+Note        : frozen snapshot of the sw_s4 pipeline for reproducibility.

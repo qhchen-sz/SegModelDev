@@ -1,0 +1,150 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    // ===== cemian1103 SOP 调试配置（产物全部输出到 segformer_v2_test/debug/，不触碰原始数据）=====
+    // 前提：用 VS Code 打开 D:/qhchen/NewModel/ADevFolder 根目录（${workspaceFolder} 解析依赖它）。
+    // 数据准备见 README.md：debug/images 等目录需自备（拷贝或 mklink /J 挂载 hefeic1 子集）。
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "SOP2 划分: isat_to_yolo_labels (debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "F:\\HymsonSoftWare\\MiniForge\\envs\\yolov10\\python.exe",
+            "program": "${workspaceFolder}/segformer_v2_test/scripts/isat_to_yolo_labels.py",
+            "args": [
+                "--images", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/debug/images",
+                "--labels", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/debug/labels",
+                "--report", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/debug/logs/labels_report.json"
+            ],
+            "cwd": "${workspaceFolder}/segformer_v2_test",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SOP3 划分: split_stratified (debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "F:\\HymsonSoftWare\\MiniForge\\envs\\yolov10\\python.exe",
+            "program": "${workspaceFolder}/segformer_v2_test/scripts/split_stratified_debug.py",
+            "args": [
+                "--images", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/debug/images",
+                "--labels", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/debug/labels",
+                "--out-dir", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/debug"
+            ],
+            "cwd": "${workspaceFolder}/segformer_v2_test",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SOP3 切块: preprocess_silie_crops (debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "F:\\HymsonSoftWare\\MiniForge\\envs\\yolov10\\python.exe",
+            "program": "${workspaceFolder}/segformer_v2_test/scripts/preprocess_silie_crops.py",
+            "args": ["--config", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/config_debug.yaml"],
+            "cwd": "${workspaceFolder}/segformer_v2_test",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SOP3 切块: convert_strat_b (debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "F:\\HymsonSoftWare\\MiniForge\\envs\\yolov10\\python.exe",
+            "program": "${workspaceFolder}/segformer_v2_test/scripts/pipeline/convert_strat_b.py",
+            "args": ["--config", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/config_debug.yaml"],
+            "cwd": "${workspaceFolder}/segformer_v2_test",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SOP3 验证: validate_dataset (debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "F:\\HymsonSoftWare\\MiniForge\\envs\\yolov10\\python.exe",
+            "program": "${workspaceFolder}/segformer_v2_test/scripts/validate_dataset.py",
+            "args": [
+                "--config", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/config_debug.yaml",
+                "--stage", "all"
+            ],
+            "cwd": "${workspaceFolder}/segformer_v2_test",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SOP4 训练: 冒烟 sw_s4_smoke (debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "F:\\HymsonSoftWare\\MiniForge\\envs\\yolov10\\python.exe",
+            "program": "${workspaceFolder}/segformer_v2_test/scripts/pipeline/train_strat_b.py",
+            "args": [
+                "--config", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/config_debug.yaml",
+                "--tag", "sw_s4_smoke",
+                "--epochs", "1",
+                "--no_resume"
+            ],
+            "cwd": "${workspaceFolder}/segformer_v2_test",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SOP4 训练: 正式 sw_s4 (debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "F:\\HymsonSoftWare\\MiniForge\\envs\\yolov10\\python.exe",
+            "program": "${workspaceFolder}/segformer_v2_test/scripts/pipeline/train_strat_b.py",
+            "args": [
+                "--config", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/config_debug.yaml",
+                "--tag", "sw_s4"
+            ],
+            "cwd": "${workspaceFolder}/segformer_v2_test",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SOP5 评估: eval_full (debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "F:\\HymsonSoftWare\\MiniForge\\envs\\yolov10\\python.exe",
+            "program": "${workspaceFolder}/segformer_v2_test/scripts/eval_full.py",
+            "args": [
+                "--config", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/config_debug.yaml",
+                "--run", "sw_s4"
+            ],
+            "cwd": "${workspaceFolder}/segformer_v2_test",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SOP5 评估: score_masks (debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "F:\\HymsonSoftWare\\MiniForge\\envs\\yolov10\\python.exe",
+            "program": "${workspaceFolder}/segformer_v2_test/scripts/score_masks.py",
+            "args": [
+                "--val-full", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/debug/dataset_strat/val_full.txt",
+                "--pred-dir", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/debug/runs_strat/sw_s4/cs_eval",
+                "--ref-dir", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/debug/runs_strat/sw_s4/cpp_eval",
+                "--out", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/debug/logs/cs_eval_metrics.json"
+            ],
+            "cwd": "${workspaceFolder}/segformer_v2_test",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "SOP6 导出: export_best_onnx (debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "F:\\HymsonSoftWare\\MiniForge\\envs\\yolov10\\python.exe",
+            "program": "${workspaceFolder}/segformer_v2_test/scripts/pipeline/export_best_onnx.py",
+            "args": [
+                "--src", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/debug/runs_strat/sw_s4/best",
+                "--out", "D:/qhchen/NewModel/ADevFolder/segformer_v2_test/debug/export/segformer_cemian_b1_640.onnx"
+            ],
+            "cwd": "${workspaceFolder}/segformer_v2_test",
+            "console": "integratedTerminal"
+        }
+    ]
+}

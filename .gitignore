@@ -19,7 +19,6 @@ deploy_cpp/EVDll_Segformer/obj
 deploy_cpp/EVDll_Segformer/SegTest/bin
 deploy_cpp/EVDll_Segformer/SegTest/obj
 **.vs/
-.vscode/
 **x64/
 deploy_cpp/segformer_dll/out
 deploy_cpp/EVDll_Segformer/out
@@ -68,7 +67,6 @@ deploy_cpp/papers/*.docx
 # IDE 用户文件
 *.user
 .vs/
-.vscode/
 
 # 系统文件
 .DS_Store
