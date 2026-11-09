@@ -22,6 +22,7 @@ def main():
     runs = Path(cfg['out_dir'])
     src = Path(a.src) if a.src else runs / 'v2_strat' / 'best'
     out = Path(a.out) if a.out else runs / 'v2_strat' / 'segformer_v2_strat_best.onnx'
+    out.parent.mkdir(parents=True, exist_ok=True)
 
     print(f'加载: {src}')
     model = SegformerForSemanticSegmentation.from_pretrained(src).eval()

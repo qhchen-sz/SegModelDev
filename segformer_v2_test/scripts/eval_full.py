@@ -21,7 +21,7 @@ from transformers import SegformerForSemanticSegmentation
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / "pipeline"))
-from sweep_eval import load_val_full, predict  # noqa: E402
+from sweep_eval import load_val_full, predict, BATCH, STRIDE, TILE  # noqa: E402
 
 
 def main():
@@ -54,6 +54,7 @@ def main():
     inter = np.zeros(3, dtype=np.float64)
     union = np.zeros(3, dtype=np.float64)
     gt_pix = np.zeros(3, dtype=np.int64)
+    pred_pix = np.zeros(3, dtype=np.int64)   # TP+FP，用于 per-class Precision
     neg_fp = []
     n_pos = 0
     psi = psu = pfi = pfu = 0.0
@@ -83,6 +84,7 @@ def main():
             union[c] += int(((pred == c) | (gt == c)).sum())
         for c in range(3):
             gt_pix[c] += int((gt == c).sum())
+            pred_pix[c] += int((pred == c).sum())
 
         if int((gt > 0).sum()) == 0:
             neg_fp.append(int((pred > 0).sum()))
@@ -94,6 +96,8 @@ def main():
             pfu += int(((pred == 2) | (gt == 2)).sum())
 
     ious = inter / (union + 1e-9)
+    recalls = inter / (gt_pix + 1e-9)          # TP/(TP+FN)
+    precisions = inter / (pred_pix + 1e-9)     # TP/(TP+FP)
     neg_fp = np.asarray(neg_fp, dtype=np.int64)
     times = np.asarray(times, dtype=np.float64) * 1000.0
 
@@ -118,6 +122,14 @@ def main():
         "bg": round(float(ious[0]), 4),
         "silie": round(float(ious[1]), 4),
         "fanzhe": round(float(ious[2]), 4),
+        "mRecall": round(float(recalls.mean()), 4),
+        "recall_bg": round(float(recalls[0]), 4),
+        "recall_silie": round(float(recalls[1]), 4),
+        "recall_fanzhe": round(float(recalls[2]), 4),
+        "mPrecision": round(float(precisions.mean()), 4),
+        "precision_bg": round(float(precisions[0]), 4),
+        "precision_silie": round(float(precisions[1]), 4),
+        "precision_fanzhe": round(float(precisions[2]), 4),
         "pos_silie": round(float(psi / (psu + 1e-9)), 4),
         "pos_fanzhe": round(float(pfi / (pfu + 1e-9)), 4),
         "neg_avg_fp": round(float(neg_fp.mean()), 1) if len(neg_fp) else 0.0,
@@ -135,13 +147,38 @@ def main():
     (out / "eval_metrics.json").write_text(
         json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    report = f"""# {args.run} 全图像素级指标（cemian1103）
+
+- 验证集: `{cfg['val_full_txt']}`（{len(lines)} 张全图，正样本 {n_pos} / 负样本 {len(neg_fp)}）
+- 口径: bs{BATCH} fp16 tile{TILE} stride{STRIDE} noTTA 全图滑窗（同 sweep_eval.predict）
+- 指标定义: IoU=TP/(TP+FP+FN)，Recall=TP/(TP+FN)，Precision=TP/(TP+FP)
+
+| 类别 | IoU | Recall | Precision |
+|---|---|---|
+| background | {ious[0]:.4f} | {recalls[0]:.4f} | {precisions[0]:.4f} |
+| silie | {ious[1]:.4f} | {recalls[1]:.4f} | {precisions[1]:.4f} |
+| fanzhe | {ious[2]:.4f} | {recalls[2]:.4f} | {precisions[2]:.4f} |
+| **均值** | **{metrics['mIoU']:.4f}** | **{metrics['mRecall']:.4f}** | **{metrics['mPrecision']:.4f}** |
+
+## 推理速度（全图）
+
+| 平均 ms/图 | p50 | p90 |
+|---|---|---|
+| {metrics['avg_ms']} | {metrics['p50_ms']} | {metrics['p90_ms']} |
+
+> 负样本 {metrics['n_neg']} 张：假阳像素均值 {metrics['neg_avg_fp']} / 最大 {metrics['neg_max_fp']}，>100px 共 {metrics['neg_gt100']} 张，全干净 {metrics['neg_clean']} 张
+"""
+    (out / "eval_report.md").write_text(report, encoding="utf-8")
+
     print(f"[{args.run}] val mIoU={metrics['mIoU']} "
           f"bg={metrics['bg']} silie={metrics['silie']} fanzhe={metrics['fanzhe']} | "
+          f"mRecall={metrics['mRecall']} mPrecision={metrics['mPrecision']} | "
           f"pos_silie={metrics['pos_silie']} pos_fanzhe={metrics['pos_fanzhe']} | "
           f"neg avg_fp={metrics['neg_avg_fp']} max={metrics['neg_max_fp']} "
           f"gt100={metrics['neg_gt100']}/{metrics['n_neg']} clean={metrics['neg_clean']} | "
           f"avg_ms={metrics['avg_ms']}")
     print(f"-> {out / 'eval_metrics.json'}")
+    print(f"-> {out / 'eval_report.md'}")
     return 0
 
 
