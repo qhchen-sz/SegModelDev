@@ -1,0 +1,38 @@
+# =============================================================================
+# segformer_v2_test —— SegFormer-B1（sw_s4 配方）训练环境依赖清单
+#
+# 依据：scripts/ 与 scripts/pipeline/ 全部脚本 import 汇总 + 实际训练环境实测版本
+# 实测环境：MiniForge conda 环境，环境名 yolov10，Python 3.9.23
+#           路径 F:\HymsonSoftWare\MiniForge\envs\yolov10\python.exe
+#           （README §5 第 5 条、.vscode/launch.json 中写死的解释器）
+#
+# 新建干净环境安装步骤：
+#   conda create -n yolov10 python=3.9 -y
+#   conda activate yolov10
+#   pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r requirments.txt
+#
+# 系统级依赖（不进 pip）：
+#   - NVIDIA 显卡驱动 + CUDA 12.1 运行时（trtexec 导出 engine 时需把 CUDA bin 加 PATH）
+#   - TensorRT trtexec（SOP6 导出 fp16 engine 用，版本须与部署端 nvinfer.dll 一致）
+#   - nvidia-smi（驱动自带，train_strat_b.py 的 GPU 温度保护 ≥85°C 暂停/≤72°C 恢复依赖它）
+# =============================================================================
+
+# ---------- 训练核心（SOP2~SOP5 必需） ----------
+torch==2.5.1              # 需 CUDA 12.1 构建（cu121）；训练用 AMP fp16 autocast + GradScaler，必须 GPU 版
+torchvision==0.20.1       # 与 torch 同版本配套
+transformers==4.57.6      # SegformerForSemanticSegmentation（train/eval/export 共用）
+numpy==1.26.4
+opencv-python==4.10.0.84  # 切块/评估/打分各脚本的 cv2
+PyYAML==6.0.1             # config_sw_s4.yaml / config_debug.yaml 配置加载
+albumentations==2.0.8     # dataset.py 训练增强（HFlip/VFlip/Rotate90/RandomScale/RandomCrop/ColorJitter/GaussianBlur）
+Pillow==10.4.0            # score_masks.py 评估打分用 PIL；transformers 亦依赖
+
+# ---------- 导出 ONNX / 校验（SOP6，仅导出部署时需要，训练本身不用） ----------
+onnx==1.14.0              # torch.onnx.export 导出 opset 17
+onnxruntime-gpu==1.18.0   # export_best_onnx.py 导出后 torch vs onnx 一致性校验（CPU provider 即可）
+
+# ---------- 间接依赖（pip 会自动安装，无需手写） ----------
+# transformers 会自动带：huggingface_hub、safetensors、tokenizers、regex 等
+# albumentations 会自动带：scipy、scikit-image、scikit-learn 等
+# timm（环境中已装 1.0.27，SegFormer transformers 原生实现并不直接依赖，属环境历史遗留）
