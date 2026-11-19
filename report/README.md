@@ -1,6 +1,6 @@
 # 极耳缺陷分割实验报告总览
 
-> 本文档汇总 `D:\qhchen\NewModel\newsiliec9`、`D:\qhchen\NewModel\ADevFolder` 与 `D:\qhchen\NewModel\hefeic1` 三个工程中的实验与部署报告，按**报告内容所对应的实验日期**排序归档，共 12 份（其中 `11A` 为 RF-DETR 对比子编号）。每份报告说明"做了什么、关键配置是什么、取得了什么结果、结论是什么"，并给出与源码、权重、数据集的对应关系。
+> 本文档汇总 `D:\qhchen\NewModel\newsiliec9`、`D:\qhchen\NewModel\ADevFolder` 与 `D:\qhchen\NewModel\hefeic1` 三个工程中的实验与部署报告，按**报告内容所对应的实验日期**排序归档，共 13 份（其中 `11A` 为 RF-DETR 对比子编号）。每份报告说明"做了什么、关键配置是什么、取得了什么结果、结论是什么"，并给出与源码、权重、数据集的对应关系。
 
 ---
 
@@ -102,6 +102,12 @@
 - **问题**：产线需要独立 C++ 程序/DLL，推理速度要从 PyTorch 的 ~864 ms 降下来；同时产线机器存在 RTX 30 系与 RTX 50 系两类显卡。
 - **做法**：导出 ONNX，用 TensorRT 8.6.1.6 构建 FP16/FP32 引擎，封装 C++ DLL 与 C# 调用层；编写跨机器 engine 导出 SOP；再适配 RTX 50（TensorRT 10.10 + CUDA 12.9 + cuDNN 9）。
 - **结果**：sw_s4 TRT FP16 在 RTX 3090 上 mIoU 0.7594、155.2 ms/图（PyTorch 864.2 ms，约 5.6x 加速），负样本假阳指标完整保留；C#→C++ DLL 路径 mIoU 0.7593、205 ms（含封送）。RTX50 适配中发现 **batch>1 数值错误**：batch=1 时缺陷类输出 31.9% 前景，batch=2/4/8/16 全部被判成背景；最终改为固定 batch=1 引擎 + 4 路独立 context/stream 并发，保证逐像素结果与 Python/RTX3090 一致。
+
+### 阶段七：部署自适应类别数改造（2026-11-19）
+
+- **问题**：新训练的焊线检测模型是 2 类（背景+焊线），而部署工程类别数硬编码为 3（0=背景/1=silie/2=fanzhe），`SegStat.px[3]/ncomp[3]` 定长、`SegConfig.numClasses=3` 严格校验，2 类引擎无法加载。
+- **做法**：借鉴 YOLO 部署（`gpu_All_Dll_func`）三条原则——类别数从引擎输出通道数 `od[1]` 读取（≥2 即可、不设上限）、类别语义不进推理链路、阈值保持运行时化；argmax/softmax 三段展开改循环；`SegStat` 移出按类别字段（sizeof 1840→1800），新增 `SegGetNumClasses()`、`SegGetStat()` 改变长数组参数；overlay 换 YOLO 80 色调色板（`label%80`）；30/50 两系 C++ 与 C#（含 47 槽 `AI_Seg_Slots`、示例脚本）同步改造。
+- **结果**：同一套 DLL 兼容任意类别数引擎（实测 2/3/5 类）；2 类 hanxian 引擎加载成功（px[bg=4354110 cls1=93735]、9 连通域）；C# 端到端 `Marshal.SizeOf==1800==SegStatSize()`；soak 200 次内存恒定、热切换不泄漏。**代价是 C ABI 变更：C# 与 C++ DLL 必须同批替换，旧脚本写死 `st.px[2]` 会越界**。详见报告 12。
 
 ---
 
@@ -322,6 +328,16 @@
 
 **结论**：RTX50 适配的难点不是接口，而是 TRT10 上的 batch 数值问题；固定 batch=1 + 多流并发在保持结果一致的前提下恢复了吞吐，是当前 RTX50 部署方案。
 
+### 12 · 2026-11-19 · [SegFormer 部署自适应类别数改造](12_2026-11-19_SegFormer部署自适应类别数改造.md)
+
+**做了什么**：把 30/50 两系部署工程（C++ DLL + C# 层 + 示例脚本）从"类别数硬编码 3 类"改造为"类别数从引擎读取、任意类别数自适应"，让 2 类的焊线检测模型（hanxian）能直接上线；overlay 配色同步切换为 YOLO 部署的 80 色调色板。
+
+**关键发现**：2 类引擎输出 logits 为 `1x2x160x160`，旧校验 `od[1] != numClasses` 直接拒载；且排查发现两个关联问题——二分类下阈值 0.5 等价纯 argmax（压假阳需 >0.5），以及 `AI_Seg1.Init` 的 `if (_model != null) return` 会让 B 工程加载静默失败、实际一直跑 A 模型（一槽一模型设计，多工程须用不同槽位或实例式 `SegModel`）。
+
+**解决方案**：借鉴 YOLO 部署三条原则——类别数 init 时从引擎 `od[1]` 读取（≥2 即可、不设上限）、类别语义不进推理链路（`boxCls` 只报 id，脚本按 `id2label` 解释）、阈值运行时化；argmax/softmax 三段展开改循环；`SegStat` 移出 `px[3]/ncomp[3]`（sizeof 1840→1800），新增 `SegGetNumClasses()`、`SegGetStat()` 改变长数组参数；C# 拆出定长封送结构 `SegStatNative` + 托管类 `SegStat`，`AI_Seg_Slots` 47 槽全部同步（50 系保留 `SegTrace` 等诊断功能）。
+
+**结论**：同一套 DLL 兼容任意类别数引擎（实测 2/3/5 类），C# 端到端数值与 C++ 一致、soak 内存恒定；**代价是 C ABI 变更——C# 与 C++ DLL 必须同批替换，旧脚本写死 `st.px[2]` 在 2 类模型上会越界，须按 `AI_Seg1.NumClasses()` 改写**。
+
 ---
 
 ## 六、源文件对应关系
@@ -340,6 +356,7 @@
 | 10 | `newsiliec9/deploy_cpp/SOP_ENGINE_EXPORT.md` | `deploy_cpp/tools/build_engine.bat`、`trtexec`、`run.bat`、`SegTest.bat` | 同报告 09；目标机 TensorRT 版本须与软件 `dll/nvinfer.dll` 一致 |
 | 11A | `ADevFolder/rfdetr/runs/{zhengmian,cemian}_base1120/metrics.csv`、`training_config.json`；`hefeic1/{view}/validation_results_more/summary.md`、`SOP_{view}_more.md` | `rfdetr/make_coco.py`、`train_rfdetr.py`、`infer_rfdetr.py`；SegFormer 侧 `hefeic1/{view}/scripts/eval_compare_more.py` | `rfdetr/datasets/{view}/{train,valid}/_annotations.coco.json`、`rfdetr/runs/{view}_base1120/checkpoint_best_ema.pth`、`hefeic1/{view}/runs_strat/sw_s4_more/best`、`hefeic1/{view}/dataset_strat_more/val_full.txt` |
 | 11 | `ADevFolder/deploy_cpp/segformer_dll50/README_RTX50.md`（最新版） | `deploy_cpp/segformer_dll50/segformer_dll.sln`、`build_engine50.bat`、`run_seg_test.bat`、`trt_engine.cpp`、`seg_pipeline.cpp` | `deploy_cpp/models/*.onnx`、`deploy_cpp/models50/*.engine`（在 RTX50 机器上构建） |
+| 12 | `ADevFolder/deploy_cpp/`（commit `4b8f365`：两系 `segformer_dll{,50}/`、同步副本 `src/`、两系 `EVDll_Segformer{,50}/`、`README.md`） | 编译：`build.bat`、两系 `build_csharp.bat`；自测：`seg_test.exe` / `SegTest.bat`、`SoftwareScriptSample.cs` | 3 类回归 `deploy_cpp/models/segformer_sw_s4_b1_640.engine`；2 类 `SceneTest/mszhc5/export/segformer_hanxian_b1_fp16_640.engine`；5 类临时引擎（自适应验证） |
 
 ---
 
@@ -354,6 +371,7 @@
 7. **RTX50 两版差异**：`newsiliec9` 中的 10-23 初版只完成 TRT10 编译适配；当前工程 11-02 版新增 batch>1 数值错误的排查结论、固定 batch=1 引擎和 4 路多流并发方案，归档取最新版，旧版未重复收录。
 8. **检测 mAP 与分割 mIoU 是两种指标**：RF-DETR 的 mAP 评价"框是否框住目标且类别正确"，SegFormer 的 IoU 评价"每个像素类别是否正确"；两者没有换算关系，报告 11A 中分列展示，不做排名。
 9. **报告 11A 的未测项**：RF-DETR 的 per-class AP（silie/fanzhe 分开）、负样本假阳、推理耗时、训练时长均未记录或未测；silie 在验证集仅 6/12 个目标，总体 mAP 可能被 fanzhe 主导，引用时需保留这些限定。
+10. **部署组件 ABI 已变更（报告 12）**：`SegStat` 从 1840 字节缩到 1800 字节（`px[3]/ncomp[3]` 移出），`SegGetStat` 签名改变——2026-11-19 之后的部署必须 C# 与 C++ DLL 同批替换；`st.px[2]` 之类的旧脚本在 2 类模型上会越界，须按 `AI_Seg1.NumClasses()` 改写。overlay 颜色也已从"红/蓝"改为 YOLO 调色板，跨版本对比叠加图时注意口径。
 
 ---
 
@@ -366,6 +384,7 @@
 - **RTX50**：TensorRT 10.10 下必须用固定 batch=1 引擎 + 多流并发，避免 batch>1 的数值错误。
 - **与 YOLO 对比**：YOLO 速度约快 43~48 倍，但在分层验证集上 silie IoU 仅 0.1291，现场漏杀批漏检 7 张真实翻折，过杀批出现大面积整块误报；SegFormer 在缺陷召回和假阳控制上明显更优。
 - **hefeic1 正/侧面**：SegFormer `sw_s4_more` 仍是唯一完成像素级验证与产线部署的方案（zhengmian combined mIoU 0.7471、负样本假阳 0；cemian 0.7893、假阳 394.8 px/图）。RF-DETR 检测路线在 cemian 上框级 mAP@0.5 0.8158，但缺少 per-class AP、过杀统计和速度，暂不能与分割路线定论。
+- **类别数自适应（报告 12）**：部署 DLL 自 2026-11-19 起兼容任意类别数的 SegFormer 引擎（实测 2/3/5 类），焊线 2 类模型可直接部署；但 `SegStat` ABI 已变更（1840→1800 字节），升级部署时 C# 与 C++ DLL 必须同批替换，旧脚本须按 `NumClasses()` 改写，叠加图配色已与 YOLO 部署对齐。
 
 ### 8.2 已提出但未实施的后续方向
 
@@ -376,6 +395,7 @@
 - **RTX50 速度实测**：报告 11 给出了 `SEGFORMER_WORKERS=1/2/4/6` 的对比方法，但尚未记录具体耗时结果，建议在目标机补齐。
 - **RF-DETR 补测**（报告 11A 提出）：用 `checkpoint_best_ema.pth` 重跑 COCO per-class AP（重点 silie）、统计 8/14 张负样本图的误检、实测推理耗时；若要与 SegFormer 严格比较，再把 mask 转连通域框或在同一检测口径下复评。
 - **两条路线选型**：若最终需要缺陷面积/斑点分析，优先保留 SegFormer；若只需要"有无 + 位置"的快速筛查，待 RF-DETR 补测证明 silie 与过杀可接受后再评估。
+- **50 机器 ABI 回归与焊线模型上线验证**（报告 12 遗留）：50 系 C++ 需在 RTX50 机器按 `README_RTX50.md` §9 重建固定 batch=1 引擎并回归 3 类/2 类；hanxian 数据集需补拍无缺陷图做阈值工作点扫描（当前无负样本，且 2 类下阈值 0.5 等价纯 argmax，压假阳需 >0.5）。
 
 ### 8.3 相关但未归档的内容
 
