@@ -46,13 +46,18 @@ struct Handle {
     TrtEngine engine;
     SegPipeline pipe;
     cv::Mat lastInput;   // 原图副本（叠加图要用；copyTo 复用缓冲，不每帧重新分配）
-    cv::Mat lastLabels;  // 最近一次 Forward 的 0/1/2 语义图
+    cv::Mat lastLabels;  // 最近一次 Forward 的语义图（0=背景，1..numClasses-1=前景类）
     cv::Mat lastOverlay; // 叠加图输出缓冲，SegGetOverlay 每帧复用，不再 clone 原图
     // computeStat 的复用缓冲：避免每帧重新分配数十 MB（statLabels 全图 CV_32S 约 31MB）
     cv::Mat statBin;        // CV_8U  H x W，(labels == c) 的二值图
     cv::Mat statLabels;     // CV_32S H x W，连通域标签
     cv::Mat statStats;      // CV_32S N x 5
     cv::Mat statCentroids;  // CV_64F N x 2
+    // 引擎类别数（SegLoad 成功后从 pipeline 读取，未加载为 0）。
+    // 按类别的统计存下面的变长数组，不进 SegStat 定长结构体——类别数不影响 ABI。
+    int numClasses = 0;
+    std::vector<long long> pxAll;    // [numClasses] 各类像素总数
+    std::vector<int> ncompAll;       // [numClasses] 各类连通域真实总数（ncompAll[0] 恒 0）
     float confidenceThreshold = 0.5f;
     bool loaded = false;
     bool statValid = false;
@@ -65,6 +70,9 @@ Handle* asHandle(void* p) {
 
 // 对 lastLabels 做像素统计 + 连通域分析（按需调用，结果缓存在 handle 里）
 void computeStat(Handle* h) {
+    const int nc = h->numClasses;
+    h->pxAll.assign(nc, 0);
+    h->ncompAll.assign(nc, 0);
     SegStat& s = h->stat;
     std::memset(&s, 0, sizeof(s));
     const cv::Mat& lab = h->lastLabels;
@@ -74,18 +82,23 @@ void computeStat(Handle* h) {
         for (int y = 0; y < lab.rows; ++y) {
             const uchar* p = lab.ptr<uchar>(y);
             for (int x = 0; x < lab.cols; ++x) {
-                const int c = p[x] <= 2 ? p[x] : 0;
-                s.px[c]++;
+                const int c = p[x] < nc ? p[x] : 0;  // 防御越界标签
+                h->pxAll[c]++;
             }
         }
     }
-    s.ng = (s.px[1] + s.px[2]) > 0 ? 1 : 0;
+    // 有任一前景类像素即为缺陷（不按具体类名判断，语义由调用方按 id2label 解释）
+    s.ng = 0;
+    for (int c = 1; c < nc; ++c) {
+        if (h->pxAll[c] > 0) {
+            s.ng = 1;
+            break;
+        }
+    }
 
-    // 全背景（OK 品）：没有缺陷类像素，连通域结果必然为空，直接返回。
+    // 全背景（OK 品）：没有前景类像素，连通域结果必然为空，直接返回。
     // 这一步能省掉两遍全图连通的扫描，是每帧最大的单项优化之一。
-    if (s.px[1] == 0 && s.px[2] == 0) {
-        s.ncomp[1] = 0;
-        s.ncomp[2] = 0;
+    if (s.ng == 0) {
         s.nbox = 0;
         return;
     }
@@ -98,9 +111,8 @@ void computeStat(Handle* h) {
 
     {
         segtrace::Scope sc("dll.stat.cc");
-        for (int c = 1; c <= 2; ++c) {
-            if (s.px[c] == 0) {  // 该类没有像素，不必扫全图
-                s.ncomp[c] = 0;
+        for (int c = 1; c < nc; ++c) {
+            if (h->pxAll[c] == 0) {  // 该类没有像素，不必扫全图
                 continue;
             }
             // 复用 statBin/statLabels/statStats/statCentroids，避免每帧几十 MB 的分配。
@@ -109,7 +121,7 @@ void computeStat(Handle* h) {
             const int n = cv::connectedComponentsWithStats(h->statBin, h->statLabels,
                                                            h->statStats, h->statCentroids, 8,
                                                            CV_32S);
-            s.ncomp[c] = n > 0 ? n - 1 : 0;  // 0 号是背景连通域，不算
+            h->ncompAll[c] = n > 0 ? n - 1 : 0;  // 0 号是背景连通域，不算
             for (int i = 1; i < n; ++i) {
                 Comp cp;
                 cp.cls = c;
@@ -231,6 +243,10 @@ bool SegLoad(const char* enginePath, void* model) {
     }
 
     h->loaded = true;
+    // 引擎类别数：pipe.init 已按输出张量维度覆盖 cfg.numClasses
+    h->numClasses = h->pipe.numClasses();
+    h->pxAll.assign(h->numClasses, 0);
+    h->ncompAll.assign(h->numClasses, 0);
     if (segtrace::enabled()) {
         // 元信息：引擎、并发路数、输入尺寸、GPU 名称。用于把 trace 和机器环境对应起来。
         std::string note = "engine=" + std::string(enginePath);
@@ -395,11 +411,15 @@ void SegFreeImage(const char* imageData) {
     delete[] imageData;
 }
 
-void SegGetStat(void* model, SegStat* out) {
+int SegGetNumClasses(void* model) {
+    Handle* h = asHandle(model);
+    return h ? h->numClasses : 0;
+}
+
+void SegGetStat(void* model, SegStat* out, long long* px, int pxCap, int* ncomp, int ncompCap) {
     segtrace::FlushOnExit flushTrace;
 
-    if (!out) return;
-    std::memset(out, 0, sizeof(SegStat));
+    if (out) std::memset(out, 0, sizeof(SegStat));
 
     Handle* h = asHandle(model);
     if (!h || h->lastLabels.empty()) {
@@ -413,12 +433,24 @@ void SegGetStat(void* model, SegStat* out) {
             computeStat(h);
             h->statValid = true;
         }
-        *out = h->stat;
+        if (out) *out = h->stat;
+        // 按类别统计走调用方分配的变长数组：与 YOLO 部署 ResultPara 同一思路，
+        // 类别数不进 ABI，换任意类别数的引擎都无需重编 C#。
+        if (px && pxCap > 0) {
+            const int n = std::min(pxCap, h->numClasses);
+            std::copy(h->pxAll.begin(), h->pxAll.begin() + n, px);
+        }
+        if (ncomp && ncompCap > 0) {
+            const int n = std::min(ncompCap, h->numClasses);
+            std::copy(h->ncompAll.begin(), h->ncompAll.begin() + n, ncomp);
+        }
         if (segtrace::enabled()) {
-            sc.setNote("ng=" + std::to_string(h->stat.ng) +
-                       (cached ? " cached=1" : " cached=0") +
-                       " comp1=" + std::to_string(h->stat.ncomp[1]) +
-                       " comp2=" + std::to_string(h->stat.ncomp[2]));
+            std::string note = "ng=" + std::to_string(h->stat.ng) +
+                               (cached ? " cached=1" : " cached=0");
+            for (int c = 1; c < h->numClasses; ++c) {
+                note += " comp" + std::to_string(c) + "=" + std::to_string(h->ncompAll[c]);
+            }
+            sc.setNote(note);
         }
     } catch (const std::exception& e) {
         setError(std::string("SegGetStat: ") + e.what());

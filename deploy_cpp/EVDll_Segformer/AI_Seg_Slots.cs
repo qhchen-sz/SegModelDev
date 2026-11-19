@@ -112,6 +112,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -257,6 +282,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -406,6 +456,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -551,6 +626,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -700,6 +800,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -845,6 +970,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -994,6 +1144,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -1139,6 +1314,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -1288,6 +1488,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -1433,6 +1658,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -1582,6 +1832,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -1727,6 +2002,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -1876,6 +2176,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -2021,6 +2346,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -2170,6 +2520,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -2315,6 +2690,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -2464,6 +2864,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -2609,6 +3034,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -2758,6 +3208,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -2903,6 +3378,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -3052,6 +3552,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -3197,6 +3722,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -3346,6 +3896,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -3491,6 +4066,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -3640,6 +4240,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -3785,6 +4410,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -3934,6 +4584,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -4079,6 +4754,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -4228,6 +4928,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -4373,6 +5098,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -4522,6 +5272,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -4667,6 +5442,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -4816,6 +5616,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -4961,6 +5786,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -5110,6 +5960,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -5255,6 +6130,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -5404,6 +6304,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -5549,6 +6474,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -5698,6 +6648,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -5843,6 +6818,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -5992,6 +6992,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -6137,6 +7162,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -6286,6 +7336,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -6431,6 +7506,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
@@ -6580,6 +7680,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -6727,6 +7852,31 @@ namespace EVDll_Segformer
             return _model == null ? new SegStat() : _model.GetStat();
         }
 
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
+        }
+
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>
         public static bool SetConfidenceThreshold(float threshold)
         {
@@ -6872,6 +8022,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>

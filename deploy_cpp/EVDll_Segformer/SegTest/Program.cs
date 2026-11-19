@@ -44,9 +44,9 @@ namespace SegTest
 
             string enginePath = args[0];
 
-            // ---- 布局自检：C# 结构体必须与 C++ 的 SegStat 逐字节一致 ----
+            // ---- 布局自检：C# 定长封送结构必须与 C++ 的 SegStat 逐字节一致 ----
             int nativeSize = SegModel.NativeStatSize();
-            int managedSize = Marshal.SizeOf(typeof(SegStat));
+            int managedSize = Marshal.SizeOf(typeof(SegStatNative));
             Console.WriteLine(string.Format("SegStat 布局: C++ {0} 字节, C# {1} 字节  -> {2}",
                 nativeSize, managedSize, nativeSize == managedSize ? "OK" : "不一致！"));
             if (nativeSize != managedSize) return 3;
@@ -150,11 +150,17 @@ namespace SegTest
                         }
                     }
                     SegStat st = model.GetStat();
+                    // 按引擎实际类别数输出（0=背景，1..N=前景类），不再写死类名
+                    System.Text.StringBuilder pxSb = new System.Text.StringBuilder();
+                    for (int c = 0; c < st.px.Length; c++)
+                        pxSb.Append((c == 0 ? "bg=" : "cls" + c + "=") + st.px[c] + " ");
+                    System.Text.StringBuilder compSb = new System.Text.StringBuilder();
+                    for (int c = 0; c < st.ncomp.Length; c++)
+                        compSb.Append((c == 0 ? "bg=" : "cls" + c + "=") + st.ncomp[c] + " ");
                     Console.WriteLine(string.Format(
-                        "  {0,-52} {1}x{2} {3:F0}ms  ng={4} px[bg={5} silie={6} fanzhe={7}] comp[bg={8} silie={9} fanzhe={10}] box={11}",
+                        "  {0,-52} {1}x{2} {3:F0}ms  ng={4} px[{5}] comp[{6}] box={7}",
                         Path.GetFileName(f), bmp.Width, bmp.Height, sw.Elapsed.TotalMilliseconds,
-                        st.ng, st.px[0], st.px[1], st.px[2],
-                        st.ncomp[0], st.ncomp[1], st.ncomp[2], st.nbox));
+                        st.ng, pxSb.ToString().TrimEnd(), compSb.ToString().TrimEnd(), st.nbox));
                 }
                 n++;
             }

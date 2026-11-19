@@ -7,6 +7,12 @@
 155 ms/图（PyTorch 864 ms）。S4 被选中的理由——负样本假阳降 82%——在部署后完整保留。
 当前默认使用 Softmax 最大置信度阈值 0.5 过滤背景；下文历史精度与速度不代表该阈值的重新评估结果。
 
+> **2026-11 变更：类别数自适应。** 类别数不再写死 3 类——`SegLoad` 时从引擎输出
+> 通道数读取（与 YOLO 部署同一思路），2 类焊线、3 类极耳、任意 N 类模型共用同一 DLL。
+> 按类别统计（px/ncomp）改为 `SegGetStat` 的变长数组参数，**`EVDll_Segformer.dll`
+> 与 `segformer_Dll_func.dll` 必须同批替换**（ABI 已变更）。叠加图前景色改用
+> YOLO 80 色调色板（`segClassColor`），老项目叠加图颜色会有变化。
+
 ---
 
 ## 1. 快速开始
@@ -268,24 +274,29 @@ run.bat --model <name> --input <单张图> --dump-logits <out.bin>
 | 函数 | 说明 |
 |---|---|
 | `void* SegCreate()` / `SegDestroy(void*)` | 不透明句柄，每个句柄一份引擎+CUDA 上下文 |
-| `bool SegLoad(const char* engine, void*)` | 加载 `.engine` |
+| `bool SegLoad(const char* engine, void*)` | 加载 `.engine`；**类别数以引擎输出通道数为准（≥2 即可），同一 DLL 兼容任意类别数的分割模型** |
 | `bool SegSetConfidenceThreshold(void*, float)` | 设置 Softmax 阈值 `[0,1]`，默认 0.5；可在加载前后调用 |
 | `int SegForward(uchar* bgr, int w, int h, int stride, void*)` | 整图滑窗推理；返回 0 成功 |
 | `const char* SegGetOverlay(int& w,int& h,int& step,int& ch, void*)` | 叠加图（BGR 3ch） |
-| `const char* SegGetMask(...)` | 纯语义图（单通道，像素值 0/1/2） |
+| `const char* SegGetMask(...)` | 纯语义图（单通道，像素值 0..numClasses-1） |
 | `void SegFreeImage(const char*)` | 释放上面两个返回的缓冲 |
-| `void SegGetStat(void*, SegStat*)` | 缺陷统计（按需计算并缓存） |
+| `int SegGetNumClasses(void*)` | 引擎类别数（SegLoad 成功后可用） |
+| `void SegGetStat(void*, SegStat*, long long* px, int pxCap, int* ncomp, int ncompCap)` | 缺陷统计（按需计算并缓存） |
 | `int SegStatSize()` / `const char* SegLastError()` | 布局自检 / 取错误原因 |
+
+**⚠️ ABI 变更（2026-11 起）**：`SegStat` 内的 `px[3]/ncomp[3]` 已移出定长结构体，
+改为 `SegGetStat` 的**变长数组参数**（与 YOLO 部署 ResultPara 同一思路——类别数不进 ABI）。
+`EVDll_Segformer.dll` 与 `segformer_Dll_func.dll` **必须同批替换**，新旧混配会在
+P/Invoke 时直接报错（非静默错误）。
 
 `SegStat`（按面积降序，不做任何最小面积过滤）：
 
 ```
-ng                    // 是否有缺陷
-px[3]                 // 各类别像素总数：0=背景 1=silie(撕裂) 2=fanzhe(翻折)
-ncomp[3]              // 各类别连通域真实总数（ncomp[0] 恒 0）
+ng                    // 是否有缺陷：任一前景类像素 > 0
 nbox / boxCls[]{64} boxX/Y/W/H[] boxPx[]
-                      // 前 64 个连通域的外接框与像素数；超出的丢掉最小的，
-                      // 而 ncomp 报的是真实总数，所以截断不会被掩盖
+                      // 前 64 个连通域的外接框与像素数；超出的丢掉最小的
+px / ncomp            // 由调用方分配、SegGetStat 填充：px[c]=第 c 类像素总数，
+                      // ncomp[c]=第 c 类连通域真实总数（长度取 SegGetNumClasses）
 ```
 
 ### C# API（`EVDll_Segformer.AI_Seg1`，与 `EVDll.AI_Gpu1` 同构）
@@ -297,10 +308,14 @@ public static bool   SetConfidenceThreshold(float threshold);
 public static bool   SetConfidenceThreshold(float threshold, ref string ErroMessage);
 public static Bitmap Run(Bitmap bitmap);                     // 叠加图
 public static Bitmap Run(Bitmap bitmap, ref string ErroMessage);
-public static Bitmap GetMask();                              // 纯 0/1/2 mask
+public static Bitmap GetMask();                              // 纯语义图（0=背景，1..N=前景类）
+public static int    NumClasses();                           // 引擎类别数（px/ncomp 的长度）
 public static SegStat GetStat();                             // 缺陷统计
 public static void   Close();
 ```
+
+`SegStat.px/ncomp` 是长度=类别数的动态数组：`px[0]=背景`，`px[1..N]=前景类`
+（含义由模型的 id2label 决定，脚本按实际类别数读取）。
 
 脚本里与 YOLO 版对照着看：
 
@@ -314,8 +329,12 @@ if (erro != "") { LogError(erro); return false; }
 SetBitMap(image, "采集图像.图像");
 
 var st = AI_Seg1.GetStat();          // 缺陷判定
-if (st.ng == 1) { /* st.px[1] 撕裂像素数 / st.px[2] 翻折像素数 / st.box* 外接框 */ }
+if (st.ng == 1) { /* st.px[c] 第 c 类像素数 / st.ncomp[c] 连通域数 / st.box* 外接框 */ }
 ```
+
+> **二分类模型注意**：softmax 最大置信度 ≥ 0.5 在两类下等价于"前景 logit > 背景 logit"，
+> 即阈值 0.5 时过滤完全退化为纯 argmax。2 类模型要压假阳，阈值必须 **> 0.5**（如 0.6~0.9
+> 扫描定工作点）。
 
 48 个静态槽都提供 `SetConfidenceThreshold`，在 `Init` 成功后调用一次即可持续生效。
 需要同时跑多个模型或更精细控制加载/释放生命周期时，也可以用实例式的 `SegModel`
@@ -334,15 +353,15 @@ if (st.ng == 1) { /* st.px[1] 撕裂像素数 / st.px[2] 翻折像素数 / st.bo
 输入图像是多通道图像,无法进行blob分析
 ```
 
-`GetMask()` 返回 `Format8bppIndexed`（像素值 0/1/2），软件 `SetBitMap` 对非
+`GetMask()` 返回 `Format8bppIndexed`（像素值 0..numClasses-1），软件 `SetBitMap` 对非
 `Format24bppRgb` 的 Bitmap 按 `"byte"` 写入，因此到斑点分析是**单通道**：
 
 ```csharp
 SetBitMap(AI_Seg1.GetMask(), "采集图像.图像");   // 斑点分析沿用原链接即可
 ```
 
-斑点分析的阈值设 `1~2` 可同时取两类；要分开统计就设 `1~1`（撕裂）与 `2~2`（翻折）。
-若要同时保留叠加图显示，给掩膜或叠加图单独建一个图像变量，二者不要写进同一个变量。
+斑点分析的阈值按类别值过滤（如两类模型 `1~1` 取第 1 前景类）；多类要同时取全部
+前景类就设 `1~N`。若要同时保留叠加图显示，给掩膜或叠加图单独建一个图像变量，二者不要写进同一个变量。
 
 > `SetBitMap` 会把宽度不是 4 的倍数的图裁到 `width - width % 4`（`EVision.Common.dll`
 > 的实现），相机图宽通常是 4 的倍数，不受影响；做 ROI 时注意这一点。
@@ -385,8 +404,10 @@ EVDll_Segformer\build_csharp.bat   :: 再出 EVDll_Segformer.dll 与 SegTest.exe
    Bitmap 的像素值。**运行时不受影响**——Halcon 拿到的是 Bitmap 对象，不是 PNG。
 3. **Softmax 置信度阈值默认 0.5**，低于阈值判为背景；`Run` 仍不带 `(conf, nms)` 参数，
    实例式 `SegModel` 可在 `Init` 后调用 `SetConfidenceThreshold` 调整，不做 NMS。
-4. 启动时会断言 `Marshal.SizeOf(SegStat) == SegStatSize()`（本机为 1840 字节），
-   布局漂移会立刻报错而不是静默读错数据。
+   注意：**二分类模型下 0.5 等价于纯 argmax（不过滤）**，要压假阳需设 > 0.5。
+4. 启动时会断言 `Marshal.SizeOf(SegStatNative) == SegStatSize()`（定长封送结构，本机为
+   1544 字节），布局漂移会立刻报错而不是静默读错数据；按类别的 px/ncomp 已改为
+   `SegGetStat` 的变长数组参数，类别数变化不影响该自检。
 
 ---
 
@@ -399,7 +420,7 @@ EVDll_Segformer\build_csharp.bat   :: 再出 EVDll_Segformer.dll 与 SegTest.exe
 | 推理 | `batch_forward` | TRT `execute_async_v3` + CUDA stream |
 | 上采样 | `F.interpolate` | `cv::resize(INTER_LINEAR)` |
 | 累加与分类 | `sliding_predict_fast` / `logits_to_labels` | 累加 `logits` 与覆盖次数，平均后做 Softmax 置信度过滤 |
-| 叠加 | `overlay` | `main.cpp:overlay`，背景(60,60,60)/silie(0,0,255)/fanzhe(255,0,0)，alpha 0.5 |
+| 叠加 | `overlay` | `seg_pipeline.cpp:segOverlayInto`，背景灰(60,60,60)，前景类用 YOLO 80 色调色板按 label 取色（`segClassColor`），alpha 0.5 |
 
 两个关键等价性：
 

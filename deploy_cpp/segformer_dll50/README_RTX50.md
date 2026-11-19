@@ -1,8 +1,14 @@
 # segformer_dll50 —— RTX 50 系列显卡适配版
 
 本目录是 `..\segformer_dll`（TensorRT 8.6 版）的 RTX 50 适配工程。
-**导出接口、`SegStat` 布局、DLL 文件名（`segformer_Dll_func.dll`）完全不变**，
-因此 C# 层 `EVDll_Segformer` 与视觉软件无需任何改动。
+**DLL 文件名（`segformer_Dll_func.dll`）不变**，C# 层 `EVDll_Segformer` 与视觉软件
+源码无需任何改动（与本目录 DLL 同批编译/分发即可）。
+
+> **2026-11 ABI 变更（两系同步）**：`SegStat` 内的 `px[3]/ncomp[3]` 已移出定长结构体，
+> 改为 `SegGetStat` 的变长数组参数（新增 `SegGetNumClasses`），类别数以引擎输出通道数
+> 为准（≥2 即可），与 TRT8.6 版共用同一套接口语义。`EVDll_Segformer.dll` 与本目录
+> DLL **必须同批替换**；旧混配会在 P/Invoke 时直接报错。叠加图前景色改用 YOLO 80 色
+> 调色板（`segClassColor`）。详见 ..\README.md 顶部变更说明。
 
 ---
 
@@ -179,8 +185,10 @@ VS 里按 F5 时，`segformer_dll.vcxproj.user` 的 `LocalDebuggerEnvironment`
 
 ## 9. 验证要点
 
-1. `seg_test.exe` 能 `LoadLibrary` 本目录的 DLL，且 `SegStat` 布局自检为 1840 字节
-2. 加载固定 batch=1 引擎：输入 `pixel_values` 应为 `1x3x640x640`、输出 `logits` 为 `1x3x160x160`
+1. `seg_test.exe` 能 `LoadLibrary` 本目录的 DLL，且 `SegStat` 定长封送结构
+   （`SegStatNative`）布局自检为 1544 字节
+2. 加载固定 batch=1 引擎：输入 `pixel_values` 应为 `1x3x640x640`、输出 `logits` 为
+   `1xC x160x160`（C=类别数，随引擎自适应：3 类极耳 C=3，2 类焊线 C=2）
 3. 单张图推理 `ng/px/comp/box` 与 TRT8 版一致或仅有 fp16 舍入级差异
 4. 89 张 `--eval` 的 mIoU 应接近 0.759（TRT 10 选核不同，允许 ±0.001 级差异）
 5. 性能：分别设 `SEGFORMER_WORKERS=1/2/4/6` 对比 ms/图；16GB 显存建议 4，若初始化时

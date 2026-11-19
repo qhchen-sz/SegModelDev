@@ -4,7 +4,7 @@
 // 分割模型的 Softmax 置信度阈值默认 0.5，低于阈值判为背景；Run 只接收 Bitmap，不做 NMS。
 //
 // 注意：Run 返回的是 3 通道叠加图（只能显示），斑点分析要用 GetMask 的
-// 单通道掩膜（0=背景 1=撕裂 2=翻折），阈值设为 1~2 即可。
+// 单通道掩膜（0=背景，1..N=前景类），按模型的 id2label 解释。
 //
 // 部署文件（详见 deploy_cpp/README.md §10）：
 //   EVDll_Segformer.dll    -> 00Exe\Plugins\   （与 EVDll.dll 同目录，脚本的 using 才能解析）
@@ -67,37 +67,35 @@ public class MyScript : ScriptMethods
                 return false;
             }
 
-            // 斑点分析输入：单通道 8bpp 语义图（0=背景 1=silie/撕裂 2=fanzhe/翻折）。
+            // 斑点分析输入：单通道 8bpp 语义图（0=背景，1..N=前景类，含义由模型 id2label 决定）。
             // 直接写回 采集图像.图像，斑点分析沿用原来的图像链接即可；
             // 若要保留原图，请给掩膜单独建一个图像变量，例如：
             // SetBitMap(AI_Seg1.GetMask(), "C#脚本.掩膜");
             SetBitMap(AI_Seg1.GetMask(), "采集图像.图像");
 
             // ---- 可选：缺陷统计（只统计最近一次 Run 的结果）----
+            // px/ncomp 长度 = 模型类别数（AI_Seg1.NumClasses() 可查）：px[0]=背景，
+            // px[1..N]=前景类像素数。st.ng=任一前景类有像素。
             // SegStat st = AI_Seg1.GetStat();
             // bool ng = st.ng == 1;
-            // long siliePx = st.px[1];       // 撕裂像素总数
-            // long fanzhePx = st.px[2];      // 翻折像素总数
-            // int silieComp = st.ncomp[1];   // 撕裂连通域总数（未做最小面积过滤）
-            // int fanzheComp = st.ncomp[2];  // 翻折连通域总数
-            // int nbox = st.nbox;            // st.box* 中有效的连通域个数，<= 64
+            // long cls1Px = st.px[1];       // 第 1 前景类像素总数（含义看模型的 id2label）
+            // int cls1Comp = st.ncomp[1];   // 第 1 前景类连通域总数（未做最小面积过滤）
+            // int nbox = st.nbox;           // st.box* 中有效的连通域个数，<= 64
 
             // 需要过滤小噪点时按像素数自行判断。box* 已按面积降序排列，
             // 超出 64 个时丢掉的是最小的那些，真实总数仍看 ncomp[]：
             // for (int i = 0; i < st.nbox; i++)
             // {
             //     if (st.boxPx[i] < 50) continue;          // 忽略小于 50 像素的连通域
-            //     int cls = st.boxCls[i];                  // 1=撕裂 2=翻折
+            //     int cls = st.boxCls[i];                  // 0=背景，1..N=前景类
             //     int x = st.boxX[i], y = st.boxY[i];
             //     int w = st.boxW[i], h = st.boxH[i];
             // }
 
             // 把结果输出给流程（方法名以软件实际的脚本 API 为准）：
             // SetInt("分割结果.NG", ng ? 1 : 0);
-            // SetInt("分割结果.撕裂像素数", (int)siliePx);
-            // SetInt("分割结果.翻折像素数", (int)fanzhePx);
-            // SetInt("分割结果.撕裂连通域数", silieComp);
-            // SetInt("分割结果.翻折连通域数", fanzheComp);
+            // SetInt("分割结果.类1像素数", (int)cls1Px);
+            // SetInt("分割结果.类1连通域数", cls1Comp);
 
             return true;
         }

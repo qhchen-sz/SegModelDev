@@ -25,7 +25,9 @@
 struct SegConfig {
     int stride = 448;      // 滑窗步长；tile 由引擎输入尺寸决定（本项目为 640）
     int batch = 16;        // 单次前向包含多少块
-    int numClasses = 3;    // 0 背景 / 1 silie / 2 fanzhe
+    // 类别数以引擎输出通道数为准（init 时用 od[1] 覆盖本值）：0=背景，1..N=前景类。
+    // 不再限制为 3 类；SegStat 中按类别的统计已改为变长数组，ABI 与类别数解耦。
+    int numClasses = 3;
     float confidenceThreshold = 0.5f;  // Softmax 最大置信度低于此值时判为背景
 };
 
@@ -40,7 +42,10 @@ public:
     bool init(TrtEngine& eng, const SegConfig& cfg, std::string& err);
     bool setConfidenceThreshold(float threshold, std::string& err);
 
-    // 整图滑窗推理，labels 输出为 CV_8UC1、原图尺寸，取值 0/1/2
+    // init 成功后返回引擎实际类别数（与 SegConfig.numClasses 无关，以引擎输出为准）。
+    int numClasses() const { return cfg_.numClasses; }
+
+    // 整图滑窗推理，labels 输出为 CV_8UC1、原图尺寸，取值 0..numClasses-1（0=背景）
     bool inferImage(const cv::Mat& bgr, cv::Mat& labels, std::string& err);
 
     // 调试用：只对左上角单个 tile 前向一次(batch=1)，返回原始 logits
@@ -88,8 +93,9 @@ private:
     double lastMs_ = 0.0;
 };
 
-// infer_fast_strat.py:71-76 的叠加图配色（BGR）：
-//   背景 (60,60,60) / silie (0,0,255) / fanzhe (255,0,0)，alpha = 0.5
+// infer_fast_strat.py:71-76 的叠加图配色约定：背景灰色 (60,60,60)、alpha = 0.5；
+// 前景类颜色与 gpu_All_Dll_func（YOLO 部署）的 COLORS 调色板保持一致：
+// label 直接索引调色板，超出长度取模循环，类别数/类名不进推理链路。
 // 注意 Python 对 c=0 也做混合，所以整幅图都会被压暗——必须照搬才能与参考叠加图对齐。
 //
 // 放在这里而不是 main.cpp，是为了让 seg_infer.exe 在评测时输出的叠加图与
@@ -101,3 +107,7 @@ cv::Mat segOverlay(const cv::Mat& bgr, const cv::Mat& labels, float alpha = 0.5f
 // 避免每帧 clone 一份原图）。dst 尺寸/类型不符时自动 create。
 void segOverlayInto(const cv::Mat& bgr, const cv::Mat& labels, cv::Mat& dst,
                     float alpha = 0.5f);
+
+// 类别 -> 叠加图颜色（BGR）：0=背景灰 (60,60,60)，前景类取 YOLO 调色板第 label 色
+// （label % 调色板长度，任意类别数都不会越界）。
+cv::Scalar segClassColor(int label);

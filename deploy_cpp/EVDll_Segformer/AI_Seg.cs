@@ -10,9 +10,12 @@
 //     SetBitMap(image, "采集图像.图像");
 //
 //     var st = AI_Seg1.GetStat();     // 缺陷判定：st.ng / st.px[] / st.box*
+//                                     // px[i]=第 i 类像素数（0=背景，长度=模型类别数）
 //
 // Softmax 置信度阈值默认 0.5，可在 Init 后通过 AI_SegN.SetConfidenceThreshold
 // 或 SegModel.SetConfidenceThreshold 调整；Run 仍不带 (conf, nms) 参数，不做 NMS。
+// 注意：二分类模型下阈值 0.5 等价于纯 argmax（不过滤），压假阳需设 > 0.5。
+// ⚠️ 本 DLL 与 segformer_Dll_func.dll 必须同批替换（GetStat ABI 已变更）。
 
 using System;
 using System.Drawing;
@@ -64,7 +67,12 @@ namespace EVDll_Segformer
         public static extern void SegFreeImage(IntPtr imageData);
 
         [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
-        public static extern void SegGetStat(IntPtr model, ref SegStat stat);
+        public static extern int SegGetNumClasses(IntPtr model);
+
+        [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void SegGetStat(IntPtr model, ref SegStatNative stat,
+                                             [Out] long[] px, int pxCap,
+                                             [Out] int[] ncomp, int ncompCap);
 
         [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
         public static extern int SegStatSize();
@@ -74,20 +82,20 @@ namespace EVDll_Segformer
     }
 
     /// <summary>
-    /// 缺陷统计。字段顺序/类型必须与 segformer_dll.h 的 SegStat 严格一致。
-    /// 刻意用扁平定长数组（对齐 EVDll 里 ResultPara 的封送风格），避免嵌套结构体的坑。
+    /// 与 segformer_dll.h SegStat 对应的**定长**封送结构：只含与类别数无关的字段。
+    /// 按类别统计（px/ncomp）走 SegGetStat 的变长数组参数，类别数不进 ABI——
+    /// 与 YOLO 部署 ResultPara 的设计一致，换任意类别数的引擎无需重编本 DLL。
+    /// 字段顺序/类型必须与 segformer_dll.h 的 SegStat 严格一致。
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 8)]
-    public struct SegStat
+    public struct SegStatNative
     {
         public const int SegMaxBox = 64;
 
         public int ng;                                          // 是否有缺陷
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-        public int[] ncomp;                                     // 各类别连通域真实总数（[0] 恒为 0）
         public int nbox;                                        // 下面数组中有效的个数
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = SegMaxBox)]
-        public int[] boxCls;                                    // 1=silie(撕裂) 2=fanzhe(翻折)
+        public int[] boxCls;                                    // 连通域类别 id：0=背景，1..N=前景类
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = SegMaxBox)]
         public int[] boxX;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = SegMaxBox)]
@@ -96,10 +104,28 @@ namespace EVDll_Segformer
         public int[] boxW;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = SegMaxBox)]
         public int[] boxH;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-        public long[] px;                                       // 各类别像素总数
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = SegMaxBox)]
         public long[] boxPx;                                    // 各连通域像素数
+    }
+
+    /// <summary>
+    /// 缺陷统计（GetStat 返回）。px/ncomp 长度 = 引擎类别数：px[0]=背景，
+    /// px[1..N]=前景类像素数（含义由模型的 id2label 决定，脚本按实际类别数读取）。
+    /// </summary>
+    public sealed class SegStat
+    {
+        public const int SegMaxBox = 64;
+
+        public int ng;                                          // 是否有缺陷
+        public int nbox;                                        // box* 中有效的个数
+        public int[] boxCls = new int[SegMaxBox];               // 连通域类别 id
+        public int[] boxX = new int[SegMaxBox];
+        public int[] boxY = new int[SegMaxBox];
+        public int[] boxW = new int[SegMaxBox];
+        public int[] boxH = new int[SegMaxBox];
+        public long[] boxPx = new long[SegMaxBox];              // 各连通域像素数
+        public long[] px = new long[0];                         // 各类别像素总数（长度=NumClasses）
+        public int[] ncomp = new int[0];                        // 各类别连通域真实总数（长度=NumClasses）
     }
 
     /// <summary>一个模型实例。可同时 new 多个（每个各自持有引擎与 CUDA 上下文）。</summary>
@@ -208,11 +234,18 @@ namespace EVDll_Segformer
             return true;
         }
 
-        /// <summary>取最近一次推理的纯语义图：单通道，像素值 0/1/2。</summary>
+        /// <summary>取最近一次推理的纯语义图：单通道，像素值 0..NumClasses-1（0=背景）。</summary>
         public Bitmap GetMask()
         {
             if (_handle == IntPtr.Zero) throw new InvalidOperationException("模型未打开，请先 Init");
             return FetchImage(true);
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：px/ncomp 数组的长度即此值。</summary>
+        public int NumClasses()
+        {
+            if (_handle == IntPtr.Zero) return 0;
+            return Native.SegGetNumClasses(_handle);
         }
 
         /// <summary>取最近一次推理的缺陷统计（原样返回，不做最小面积过滤）。</summary>
@@ -220,7 +253,19 @@ namespace EVDll_Segformer
         {
             SegStat st = new SegStat();
             if (_handle == IntPtr.Zero) return st;
-            Native.SegGetStat(_handle, ref st);
+            int nc = Native.SegGetNumClasses(_handle);
+            st.px = new long[nc];
+            st.ncomp = new int[nc];
+            SegStatNative nat = new SegStatNative();
+            Native.SegGetStat(_handle, ref nat, st.px, st.px.Length, st.ncomp, st.ncomp.Length);
+            st.ng = nat.ng;
+            st.nbox = nat.nbox;
+            st.boxCls = nat.boxCls;
+            st.boxX = nat.boxX;
+            st.boxY = nat.boxY;
+            st.boxW = nat.boxW;
+            st.boxH = nat.boxH;
+            st.boxPx = nat.boxPx;
             return st;
         }
 
@@ -344,14 +389,37 @@ namespace EVDll_Segformer
             }
         }
 
-        // 掩膜图的像素值仍是原始 0/1/2（Halcon 侧可直接读取），调色板只是让它看起来可解释
+        // 掩膜图的像素值仍是原始 0..N（Halcon 侧可直接读取），调色板只是让它看起来可解释。
+        // 前景色与 C++ segClassColor / gpu_All_Dll_func COLORS 同源（YOLO 80 色调色板），
+        // 按标签值直接索引、超出取模，任意类别数都不会越界。
+        private static readonly byte[,] kPaletteBgr = {
+            {0,114,189},{217,83,25},{237,177,32},{126,47,142},{119,172,48},
+            {77,190,238},{162,20,47},{76,76,76},{153,153,153},{255,0,0},
+            {255,128,0},{191,191,0},{0,255,0},{0,0,255},{170,0,255},
+            {85,85,0},{85,170,0},{85,255,0},{170,85,0},{170,170,0},
+            {170,255,0},{255,85,0},{255,170,0},{255,255,0},{0,85,128},
+            {0,170,128},{0,255,128},{85,0,128},{85,85,128},{85,170,128},
+            {85,255,128},{170,0,128},{170,85,128},{170,170,128},{170,255,128},
+            {255,0,128},{255,85,128},{255,170,128},{255,255,128},{0,85,255},
+            {0,170,255},{0,255,255},{85,0,255},{85,85,255},{85,170,255},
+            {85,255,255},{170,0,255},{170,85,255},{170,170,255},{170,255,255},
+            {255,0,255},{255,85,255},{255,170,255},{85,0,0},{128,0,0},
+            {170,0,0},{212,0,0},{255,0,0},{0,43,0},{0,85,0},
+            {0,128,0},{0,170,0},{0,212,0},{0,255,0},{0,0,43},
+            {0,0,85},{0,0,128},{0,0,170},{0,0,212},{0,0,255},
+            {0,0,0},{36,36,36},{73,73,73},{109,109,109},{146,146,146},
+            {182,182,182},{219,219,219},{0,114,189},{80,183,189},{128,128,0}};
+
         private static void ApplySegPalette(Bitmap bmp)
         {
             ColorPalette pal = bmp.Palette;
-            for (int i = 0; i < pal.Entries.Length; i++) pal.Entries[i] = Color.Black;
             pal.Entries[0] = Color.Black;   // 背景
-            pal.Entries[1] = Color.Red;     // silie 撕裂
-            pal.Entries[2] = Color.Blue;    // fanzhe 翻折
+            for (int i = 1; i < pal.Entries.Length; i++)
+            {
+                int k = i % 80;             // 与 C++ segClassColor 同一取模约定
+                pal.Entries[i] = Color.FromArgb(kPaletteBgr[k, 2], kPaletteBgr[k, 1],
+                                                kPaletteBgr[k, 0]);  // BGR -> RGB
+            }
             bmp.Palette = pal;
         }
 
@@ -488,6 +556,31 @@ namespace EVDll_Segformer
         public static SegStat GetStat()
         {
             return _model == null ? new SegStat() : _model.GetStat();
+        }
+
+        /// <summary>引擎类别数（SegLoad 后可用）：GetStat 返回的 px/ncomp 长度即此值。</summary>
+        public static int NumClasses()
+        {
+            string dummy = null;
+            return NumClasses(ref dummy);
+        }
+
+        public static int NumClasses(ref string ErroMessage)
+        {
+            if (_model == null)
+            {
+                ErroMessage = "模型未打开";
+                return 0;
+            }
+            try
+            {
+                return _model.NumClasses();
+            }
+            catch (Exception e)
+            {
+                ErroMessage = "取类别数报错：" + e;
+                return 0;
+            }
         }
 
         /// <summary>设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景。</summary>

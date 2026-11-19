@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 
 namespace {
 
@@ -34,9 +35,33 @@ void fillNCHW(const cv::Mat& bgr, float* dst, int tile) {
 
 }  // namespace
 
+// 与 gpu_All_Dll_func\infer.cpp 的 COLORS 完全同源（YOLO 部署的 80 色调色板，BGR）。
+// draw_objects 按 COLORS[label] 直接索引；这里沿用同一约定，超出长度取模循环，
+// 使任意类别数的模型都能直接部署（类别数与颜色/语义解耦）。
+cv::Scalar segClassColor(int label) {
+    static const unsigned char kColors[80][3] = {
+        {0, 114, 189},   {217, 83, 25},   {237, 177, 32},  {126, 47, 142},  {119, 172, 48},
+        {77, 190, 238},  {162, 20, 47},   {76, 76, 76},    {153, 153, 153}, {255, 0, 0},
+        {255, 128, 0},   {191, 191, 0},   {0, 255, 0},     {0, 0, 255},     {170, 0, 255},
+        {85, 85, 0},     {85, 170, 0},    {85, 255, 0},    {170, 85, 0},    {170, 170, 0},
+        {170, 255, 0},   {255, 85, 0},    {255, 170, 0},   {255, 255, 0},   {0, 85, 128},
+        {0, 170, 128},   {0, 255, 128},   {85, 0, 128},    {85, 85, 128},   {85, 170, 128},
+        {85, 255, 128},  {170, 0, 128},   {170, 85, 128},  {170, 170, 128}, {170, 255, 128},
+        {255, 0, 128},   {255, 85, 128},  {255, 170, 128}, {255, 255, 128}, {0, 85, 255},
+        {0, 170, 255},   {0, 255, 255},   {85, 0, 255},    {85, 85, 255},   {85, 170, 255},
+        {85, 255, 255},  {170, 0, 255},   {170, 85, 255},  {170, 170, 255}, {170, 255, 255},
+        {255, 0, 255},   {255, 85, 255},  {255, 170, 255}, {85, 0, 0},      {128, 0, 0},
+        {170, 0, 0},     {212, 0, 0},     {255, 0, 0},     {0, 43, 0},      {0, 85, 0},
+        {0, 128, 0},     {0, 170, 0},     {0, 212, 0},     {0, 255, 0},     {0, 0, 43},
+        {0, 0, 85},      {0, 0, 128},     {0, 0, 170},     {0, 0, 212},     {0, 0, 255},
+        {0, 0, 0},       {36, 36, 36},    {73, 73, 73},    {109, 109, 109}, {146, 146, 146},
+        {182, 182, 182}, {219, 219, 219}, {0, 114, 189},   {80, 183, 189},  {128, 128, 0}};
+    if (label <= 0) return cv::Scalar(60, 60, 60);  // 背景
+    const unsigned char* c = kColors[label % 80];
+    return cv::Scalar(c[0], c[1], c[2]);
+}
+
 void segOverlayInto(const cv::Mat& bgr, const cv::Mat& labels, cv::Mat& dst, float alpha) {
-    const cv::Vec3f cols[3] = {cv::Vec3f(60, 60, 60), cv::Vec3f(0, 0, 255),
-                               cv::Vec3f(255, 0, 0)};
     // copyTo 在 dst 尺寸/类型已匹配时直接复用其内存，不会每帧重新分配。
     bgr.copyTo(dst);
     // 逐行独立，行并行不改变任何输出像素（叠加图在 DLL 的每帧路径上，值得并行）
@@ -45,7 +70,7 @@ void segOverlayInto(const cv::Mat& bgr, const cv::Mat& labels, cv::Mat& dst, flo
             const uchar* lab = labels.ptr<uchar>(y);
             cv::Vec3b* row = dst.ptr<cv::Vec3b>(y);
             for (int x = 0; x < dst.cols; ++x) {
-                const cv::Vec3f& c = cols[std::min<int>(lab[x], 2)];
+                const cv::Scalar c = segClassColor(lab[x]);
                 for (int k = 0; k < 3; ++k) {
                     row[x][k] = static_cast<uchar>(row[x][k] * (1.0f - alpha) + c[k] * alpha);
                 }
@@ -125,10 +150,18 @@ bool SegPipeline::init(TrtEngine& eng, const SegConfig& cfg, std::string& err) {
     std::size_t outElems = 0;
     if (!eng.setBatch(cfg_.batch, outElems, err)) return false;
     const std::vector<int>& od = eng.outputDims();
-    if (od.size() != 4 || od[1] != cfg_.numClasses) {
+    if (od.size() != 4) {
         err = "unexpected engine output dims";
         return false;
     }
+    // 类别数以引擎为准（与 YOLO 部署同一思路：换模型=换引擎，维度自适应）。
+    // 仅要求 >=2（背景+至少一个前景类）；上限不受 ABI 限制——SegStat 的按类别
+    // 统计已改为变长数组（见 segformer_dll.h）。
+    if (od[1] < 2) {
+        err = "engine logits classes must be >= 2 (background + at least one foreground)";
+        return false;
+    }
+    cfg_.numClasses = od[1];
     outH_ = od[2];
     outW_ = od[3];
 
@@ -341,31 +374,28 @@ bool SegPipeline::inferImage(const cv::Mat& bgrIn, cv::Mat& labels, std::string&
     }
 
     // Softmax 必须在平均 logits 上计算，覆盖次数不能在概率计算前约掉。
+    // argmax/softmax 按 numClasses 循环（替代原三段展开），支持任意类别数。
+    const int nc = cfg_.numClasses;
     labels.create(H, W, CV_8UC1);
     cv::parallel_for_(cv::Range(0, H), [&](const cv::Range& r) {
+        std::vector<const float*> a(static_cast<std::size_t>(nc));
         for (int y = r.start; y < r.end; ++y) {
-            const float* a0 = acc_[0].ptr<float>(y);
-            const float* a1 = acc_[1].ptr<float>(y);
-            const float* a2 = acc_.size() > 2 ? acc_[2].ptr<float>(y) : nullptr;
+            for (int c = 0; c < nc; ++c) a[c] = acc_[c].ptr<float>(y);
             const float* cov = cov_.ptr<float>(y);
             uchar* out = labels.ptr<uchar>(y);
             for (int x = 0; x < W; ++x) {
                 const float invCov = 1.0f / std::max(cov[x], 1e-6f);
-                const float v0 = a0[x] * invCov;
-                const float v1 = a1[x] * invCov;
-                const float v2 = a2 ? a2[x] * invCov : 0.0f;
+                float bv = -std::numeric_limits<float>::max();
                 int best = 0;
-                float bv = v0;
-                if (v1 > bv) {
-                    best = 1;
-                    bv = v1;
+                for (int c = 0; c < nc; ++c) {
+                    const float v = a[c][x] * invCov;
+                    if (v > bv) {
+                        bv = v;
+                        best = c;
+                    }
                 }
-                if (a2 && v2 > bv) {
-                    best = 2;
-                    bv = v2;
-                }
-                float denom = std::exp(v0 - bv) + std::exp(v1 - bv);
-                if (a2) denom += std::exp(v2 - bv);
+                float denom = 0.0f;
+                for (int c = 0; c < nc; ++c) denom += std::exp(a[c][x] * invCov - bv);
                 const float confidence = 1.0f / denom;
                 out[x] = static_cast<uchar>(confidence >= cfg_.confidenceThreshold ? best : 0);
             }

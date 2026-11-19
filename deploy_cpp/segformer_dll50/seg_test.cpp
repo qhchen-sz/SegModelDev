@@ -36,17 +36,16 @@
 namespace fs = std::filesystem;
 
 // ---- 与 segformer_dll.h 完全一致的 SegStat 布局（sizeof 由 SegStatSize() 断言）----
+// 按类别的 px/ncomp 已移出结构体，经 SegGetStat 的变长数组参数取（长度问 SegGetNumClasses）。
 #define SEG_MAX_BOX 64
 struct SegStat {
     int       ng;
-    int       ncomp[3];
     int       nbox;
     int       boxCls[SEG_MAX_BOX];
     int       boxX[SEG_MAX_BOX];
     int       boxY[SEG_MAX_BOX];
     int       boxW[SEG_MAX_BOX];
     int       boxH[SEG_MAX_BOX];
-    long long px[3];
     long long boxPx[SEG_MAX_BOX];
 };
 
@@ -59,7 +58,8 @@ typedef int         (*SegForwardMask_t)(unsigned char*, int, int, int, void*);
 typedef const char* (*SegGetOverlay_t)(int&, int&, int&, int&, void*);
 typedef const char* (*SegGetMask_t)(int&, int&, int&, int&, void*);
 typedef void        (*SegFreeImage_t)(const char*);
-typedef void        (*SegGetStat_t)(void*, SegStat*);
+typedef int         (*SegGetNumClasses_t)(void*);
+typedef void        (*SegGetStat_t)(void*, SegStat*, long long*, int, int*, int);
 typedef int         (*SegStatSize_t)();
 typedef const char* (*SegLastError_t)();
 
@@ -73,6 +73,7 @@ struct DllApi {
     SegGetOverlay_t GetOverlay = nullptr;
     SegGetMask_t    GetMask = nullptr;
     SegFreeImage_t  FreeImage = nullptr;
+    SegGetNumClasses_t GetNumClasses = nullptr;  // 可选导出：旧 DLL 没有
     SegGetStat_t    GetStat = nullptr;
     SegStatSize_t   StatSize = nullptr;
     SegLastError_t  LastError = nullptr;
@@ -93,6 +94,7 @@ struct DllApi {
         }
         // 可选导出：缺失时不报错，--runmask 自动回退到 SegForward
         ForwardMask = reinterpret_cast<SegForwardMask_t>(GetProcAddress(h, "SegForwardMask"));
+        GetNumClasses = reinterpret_cast<SegGetNumClasses_t>(GetProcAddress(h, "SegGetNumClasses"));
         return grab("SegCreate", Create) && grab("SegDestroy", Destroy) &&
                grab("SegLoad", Load) && grab("SegForward", Forward) &&
                grab("SegGetOverlay", GetOverlay) && grab("SegGetMask", GetMask) &&
@@ -134,14 +136,35 @@ static std::vector<std::string> listImages(const std::string& path) {
     return files;
 }
 
-static void printStat(const SegStat& s) {
-    std::printf("    ng=%d  像素: bg=%lld silie=%lld fanzhe=%lld\n",
-                s.ng, s.px[0], s.px[1], s.px[2]);
-    std::printf("    连通域数: silie=%d fanzhe=%d (boxes=%d)\n",
-                s.ncomp[1], s.ncomp[2], s.nbox);
-    for (int i = 0; i < s.nbox; ++i) {
+// 定长结构 + 按类别变长统计（长度问 SegGetNumClasses；旧 DLL 无该导出时只取定长部分）
+struct FullStat {
+    SegStat fixed;
+    std::vector<long long> px;
+    std::vector<int> ncomp;
+};
+
+static FullStat fetchStat(const DllApi& a, void* model) {
+    FullStat f;
+    const int nc = a.GetNumClasses ? a.GetNumClasses(model) : 0;
+    f.px.assign(nc, 0);
+    f.ncomp.assign(nc, 0);
+    a.GetStat(model, &f.fixed, f.px.data(), static_cast<int>(f.px.size()),
+              f.ncomp.data(), static_cast<int>(f.ncomp.size()));
+    return f;
+}
+
+static void printStat(const FullStat& s) {
+    std::printf("    ng=%d  像素:", s.fixed.ng);
+    for (int c = 0; c < static_cast<int>(s.px.size()); ++c)
+        std::printf(" %s=%lld", c == 0 ? "bg" : ("cls" + std::to_string(c)).c_str(), s.px[c]);
+    std::printf("\n    连通域数:");
+    for (int c = 1; c < static_cast<int>(s.ncomp.size()); ++c)
+        std::printf(" cls%d=%d", c, s.ncomp[c]);
+    std::printf(" (boxes=%d)\n", s.fixed.nbox);
+    for (int i = 0; i < s.fixed.nbox; ++i) {
         std::printf("      #%d cls=%d box=(%d,%d,%d,%d) px=%lld\n",
-                    i, s.boxCls[i], s.boxX[i], s.boxY[i], s.boxW[i], s.boxH[i], s.boxPx[i]);
+                    i, s.fixed.boxCls[i], s.fixed.boxX[i], s.fixed.boxY[i],
+                    s.fixed.boxW[i], s.fixed.boxH[i], s.fixed.boxPx[i]);
     }
 }
 
@@ -209,7 +232,7 @@ static int runImages(DllApi& a, const std::string& engine, const std::vector<std
                 if (!mkm.empty()) cv::imwrite((fs::path(outDir) / "mask" / (stem + ".png")).string(), mkm);
             }
         }
-        if (wantStat) { SegStat s; a.GetStat(model, &s); printStat(s); }
+        if (wantStat) { FullStat s = fetchStat(a, model); printStat(s); }
     }
     std::printf("[done] %zu 张, 平均 %.1f ms/图\n", files.size(),
                 files.empty() ? 0.0 : totalMs / files.size());
@@ -266,8 +289,7 @@ static int runSoak(DllApi& a, const std::string& engine, const std::string& inpu
             if (ov) a.FreeImage(ov);
             const char* mk = a.GetMask(w, h, step, ch, model);
             if (mk) a.FreeImage(mk);
-            SegStat st;
-            a.GetStat(model, &st);
+            fetchStat(a, model);  // 触发统计路径（结果不打印）
         }
         if (i == 9 || (i + 1) % 20 == 0 || i + 1 == iters) {
             char tag[32];
@@ -326,7 +348,10 @@ static int runEval(DllApi& a, const std::string& engine, const std::string& valF
         return 1;
     }
 
-    double inter[3] = {0, 0, 0}, uni[3] = {0, 0, 0}, totalMs = 0.0;
+    // 类别数以引擎为准（SegGetNumClasses）；旧 DLL 没有该导出时退化为 3 类
+    const int nc = a.GetNumClasses ? a.GetNumClasses(model) : 3;
+    std::vector<double> inter(nc, 0.0), uni(nc, 0.0);
+    double totalMs = 0.0;
     int counted = 0;
     for (size_t i = 0; i < lines.size(); ++i) {
         cv::Mat img = cv::imread(lines[i].first, cv::IMREAD_COLOR);
@@ -345,21 +370,23 @@ static int runEval(DllApi& a, const std::string& engine, const std::string& valF
         if (pred.empty()) continue;
         if (pred.size() != gt.size()) cv::resize(gt, gt, pred.size(), 0, 0, cv::INTER_NEAREST);
 
-        for (int c = 0; c < 3; ++c) {
+        for (int c = 0; c < nc; ++c) {
             cv::Mat pm = (pred == c), gm = (gt == c);
             inter[c] += cv::countNonZero(pm & gm);
             uni[c]   += cv::countNonZero(pm | gm);
         }
-        if (wantStat) { SegStat s; a.GetStat(model, &s); if (i < 3) printStat(s); }
+        if (wantStat) { FullStat s = fetchStat(a, model); if (i < 3) printStat(s); }
         counted++;
         if (i < 3 || (i + 1) % 20 == 0) std::printf("  [%zu/%zu]\n", i + 1, lines.size());
     }
-    double iou[3], miou = 0;
-    for (int c = 0; c < 3; ++c) { iou[c] = inter[c] / (uni[c] + 1e-9); miou += iou[c]; }
-    miou /= 3.0;
-    std::printf("\n=== seg_test --eval (%d 张) ===\n", counted);
-    std::printf("background IoU=%.4f\nsilie IoU=%.4f\nfanzhe IoU=%.4f\nmIoU=%.4f\n",
-                iou[0], iou[1], iou[2], miou);
+    std::vector<double> iou(nc);
+    double miou = 0;
+    for (int c = 0; c < nc; ++c) { iou[c] = inter[c] / (uni[c] + 1e-9); miou += iou[c]; }
+    miou /= nc;
+    std::printf("\n=== seg_test --eval (%d 张, %d 类) ===\n", counted, nc);
+    for (int c = 0; c < nc; ++c)
+        std::printf("class%d IoU=%.4f%s\n", c, iou[c], c == 0 ? " (background)" : "");
+    std::printf("mIoU=%.4f\n", miou);
     std::printf("avg %.1f ms/图\n", counted ? totalMs / counted : 0.0);
     a.Destroy(model);
     return 0;

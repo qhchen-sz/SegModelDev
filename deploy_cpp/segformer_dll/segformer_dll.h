@@ -25,15 +25,13 @@
 #endif
 
 struct SegStat {
-    int       ng;                  // 是否有缺陷：px[1] + px[2] > 0
-    int       ncomp[3];            // 各类别连通域真实总数（ncomp[0] 恒为 0，背景不计）
+    int       ng;                  // 是否有缺陷：任一前景类（1..numClasses-1）像素 > 0
     int       nbox;                // 下面 box* 数组中有效的个数，<= SEG_MAX_BOX
-    int       boxCls[SEG_MAX_BOX]; // 连通域类别：1=silie(撕裂) 2=fanzhe(翻折)
+    int       boxCls[SEG_MAX_BOX]; // 连通域类别 id：0=背景，1..numClasses-1=前景类（含义由模型 id2label 决定）
     int       boxX[SEG_MAX_BOX];
     int       boxY[SEG_MAX_BOX];
     int       boxW[SEG_MAX_BOX];
     int       boxH[SEG_MAX_BOX];
-    long long px[3];               // 各类别像素总数：0=背景 1=silie 2=fanzhe
     long long boxPx[SEG_MAX_BOX];  // 各连通域的像素数，与 box* 一一对应
 };
 
@@ -43,10 +41,12 @@ SEG_API void  SegDestroy(void* model);
 
 // ---- 加载 / 推理 -------------------------------------------------------
 // 加载 .engine；成功返回 true。失败时用 SegLastError() 取原因。
+// 类别数以引擎输出通道数为准（>=2 即可），同一 DLL 兼容任意类别数的分割模型。
 SEG_API bool  SegLoad(const char* enginePath, void* model);
 
 // 设置 Softmax 最大置信度阈值 [0,1]，默认 0.5；低于阈值判为背景，等于阈值保留。
 // 可在 SegLoad 前或后调用；成功返回 true，非法阈值返回 false，原因见 SegLastError。
+// 注意：二分类模型下阈值 0.5 等价于纯 argmax（不过滤），压假阳需设 > 0.5。
 SEG_API bool  SegSetConfidenceThreshold(void* model, float threshold);
 
 // 整图滑窗推理。bgrData 为 BGR/24bpp/带 stride 的原始像素。
@@ -59,16 +59,24 @@ SEG_API int   SegForward(unsigned char* bgrData, int width, int height, int stri
 SEG_API int   SegForwardMask(unsigned char* bgrData, int width, int height, int stride, void* model);
 
 // ---- 取结果图（调用方负责 SegFreeImage）--------------------------------
-// 叠加图：原图上把缺陷区域上色（与 seg_infer.exe --eval 输出、与 PyTorch 参考叠加图同一实现）
+// 叠加图：原图上把缺陷区域上色（与 seg_infer.exe --eval 输出同一实现）
 SEG_API const char* SegGetOverlay(int& width, int& height, int& step, int& channels, void* model);
-// 纯语义图：单通道，像素值 0/1/2
+// 纯语义图：单通道，像素值 0..numClasses-1（0=背景）
 SEG_API const char* SegGetMask(int& width, int& height, int& step, int& channels, void* model);
 SEG_API void SegFreeImage(const char* imageData);
 
 // ---- 缺陷统计 ----------------------------------------------------------
+// 引擎类别数（SegLoad 成功后可用，未加载返回 0）。
+// 用于让调用方按实际长度分配下面 SegGetStat 的 px / ncomp 数组。
+SEG_API int SegGetNumClasses(void* model);
+
 // 对最近一次 SegForward 的结果做连通域统计（按需计算并缓存，不调用就没有开销）。
 // 不做任何最小面积过滤，小连通域原样报出，过滤交给调用方。
-SEG_API void SegGetStat(void* model, SegStat* out);
+// px / ncomp 由调用方分配并通过 pxCap / ncompCap 传容量，实际填充 min(cap, 类别数) 项；
+// 传 nullptr 则只取定长部分。按类别的统计不进 SegStat 结构体，类别数变化不影响 ABI
+// （与 YOLO 部署 ResultPara 的设计一致）。
+SEG_API void SegGetStat(void* model, SegStat* out,
+                        long long* px, int pxCap, int* ncomp, int ncompCap);
 
 // sizeof(SegStat)。C# 侧启动时断言 Marshal.SizeOf 与它一致，布局漂移会立刻暴露。
 SEG_API int SegStatSize();
